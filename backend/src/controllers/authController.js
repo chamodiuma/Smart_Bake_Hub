@@ -12,7 +12,7 @@ const generateToken = (id, role) => {
 
 const checkSetupStatus = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT COUNT(*) as count FROM users');
+        const [rows] = await pool.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'");
         const count = parseInt(rows[0].count, 10);
         const isFirstSetup = count === 0;
         res.json({ isFirstSetup });
@@ -24,16 +24,33 @@ const checkSetupStatus = async (req, res) => {
 const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
     try {
-        // Check if this is the first user in the system
-        const [userCount] = await pool.query('SELECT COUNT(*) as count FROM users');
-        const count = parseInt(userCount[0].count, 10);
+        // Check if there is an active admin in the system
+        const [adminCount] = await pool.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'");
+        const count = parseInt(adminCount[0].count, 10);
         const isFirstUser = count === 0;
         
         // Force role: first user is always admin, subsequent are customers
         const role = isFirstUser ? 'admin' : 'customer';
 
-        const [userExists] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+        const [userExists] = await pool.query('SELECT id, status, role FROM users WHERE email = ?', [email]);
         if (userExists.length > 0) {
+            if (userExists[0].status === 'pending_verification') {
+                const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
+                await pool.query('UPDATE users SET verification_token = ? WHERE id = ?', [verificationToken, userExists[0].id]);
+                const emailSent = await sendOtpEmail(email, verificationToken);
+                if (!emailSent) {
+                    console.log(`\n=========================================\n[FALLBACK] YOUR OTP CODE FOR ${email} IS: [ ${verificationToken} ]\n=========================================\n`);
+                }
+                return res.status(200).json({
+                    message: 'OTP sent to your email!',
+                    id: userExists[0].id,
+                    name,
+                    email,
+                    role: userExists[0].role,
+                    status: 'pending_verification',
+                    devOtp: !emailSent ? verificationToken : null
+                });
+            }
             return res.status(400).json({ message: 'User already exists' });
         }
 

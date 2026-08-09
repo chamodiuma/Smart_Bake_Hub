@@ -1,4 +1,4 @@
-﻿-- MySQL dump 10.13  Distrib 8.0.46, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.0.46, for Linux (x86_64)
 --
 -- Host: localhost    Database: smart_bake_hub
 -- ------------------------------------------------------
@@ -375,7 +375,6 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Test Admin','chamodiumayangana2001@gmail.com','$2b$10$2uPpIsMl1l2rCAjuSyUm4eJllIheFYqXMP.wtICgtIzj0FyWEca/O','admin','active',NULL,NULL,NULL,'2026-07-04 11:54:54','2026-07-04 11:54:54'),(2,'kaveesha','kaveeshanimmani2@gmail.com','$2b$10$ZGQTLTxeBlMoo9gzUC251.pqzHFRLF0AIvNcJaoghYmzH45MsIVRu','customer','active',NULL,NULL,NULL,'2026-07-04 13:03:23','2026-07-04 13:03:23');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
