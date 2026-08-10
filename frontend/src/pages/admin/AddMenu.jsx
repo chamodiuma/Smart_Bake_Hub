@@ -81,7 +81,12 @@ const AddMenu = () => {
         if (!formData.menu_category) { toast.error('Menu category is required'); return false; }
         if (!formData.category) { toast.error('Category is required'); return false; }
         
-        if (!formData.price || parseFloat(formData.price) <= 0) { toast.error('Valid price is required'); return false; }
+        if (formData.portion_type === 'regular') {
+            if (!formData.price || parseFloat(formData.price) <= 0) { toast.error('Valid price is required'); return false; }
+        } else {
+            if (!formData.price_small || parseFloat(formData.price_small) <= 0) { toast.error('Valid small price is required'); return false; }
+            if (!formData.price_large || parseFloat(formData.price_large) <= 0) { toast.error('Valid large price is required'); return false; }
+        }
         return true;
     };
 
@@ -96,7 +101,10 @@ const AddMenu = () => {
                 name: formData.name,
                 menu_category: formData.menu_category,
                 category_id: formData.category || null,
-                price: (parseFloat(formData.price) || 0)
+                portion_type: formData.portion_type,
+                price: formData.portion_type === 'regular' ? (parseFloat(formData.price) || 0) : 0,
+                price_small: formData.portion_type === 'varied' ? (parseFloat(formData.price_small) || 0) : 0,
+                price_large: formData.portion_type === 'varied' ? (parseFloat(formData.price_large) || 0) : 0
             };
 
             await api.post('/menus', payload);
@@ -202,8 +210,50 @@ const AddMenu = () => {
                         </div>
 
                         <div className="bg-white rounded-xl border p-6">
-                            <label className="block text-sm font-semibold mb-2">Price (Rs.) <span className="text-red-500">*</span></label>
-                            <input name="price" type="number" step="0.01" min="0" value={formData.price} onChange={handleInputChange} className="w-full px-4 py-2.5 border rounded-lg" />
+                            <label className="block text-sm font-semibold mb-4">Pricing Options</label>
+                            
+                            <div className="flex gap-4 mb-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="portion_type" 
+                                        value="regular" 
+                                        checked={formData.portion_type === 'regular'} 
+                                        onChange={handleInputChange} 
+                                        className="text-[#C8843B]" 
+                                    />
+                                    <span className="text-sm font-medium">Regular Price</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="portion_type" 
+                                        value="varied" 
+                                        checked={formData.portion_type === 'varied'} 
+                                        onChange={handleInputChange} 
+                                        className="text-[#C8843B]" 
+                                    />
+                                    <span className="text-sm font-medium">Small / Large Sizes</span>
+                                </label>
+                            </div>
+
+                            {formData.portion_type === 'regular' ? (
+                                <div>
+                                    <label className="block text-xs font-semibold mb-2 text-gray-500">Regular Price (Rs.) <span className="text-red-500">*</span></label>
+                                    <input name="price" type="number" step="0.01" min="0" value={formData.price} onChange={handleInputChange} className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:border-[#C8843B]" />
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-2 text-gray-500">Small Portion Price (Rs.) <span className="text-red-500">*</span></label>
+                                        <input name="price_small" type="number" step="0.01" min="0" value={formData.price_small} onChange={handleInputChange} className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:border-[#C8843B]" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-2 text-gray-500">Large Portion Price (Rs.) <span className="text-red-500">*</span></label>
+                                        <input name="price_large" type="number" step="0.01" min="0" value={formData.price_large} onChange={handleInputChange} className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:border-[#C8843B]" />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-3 pt-4">

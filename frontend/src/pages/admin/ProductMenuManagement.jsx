@@ -181,38 +181,51 @@ const ProductMenuManagement = () => {
                             <div className="p-6 flex-1 flex flex-col justify-center relative">
                                     <div className="flex justify-center items-center py-2 relative group">
                                         <div className="text-center">
-                                            {editingPrice.menuId === menu.id && editingPrice.priceType === 'price' ? (
-                                                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-[#C8843B]/40 shadow-sm">
-                                                    <span className="text-[#C8843B] font-bold">Rs.</span>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={editingPrice.value} 
-                                                        onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                                                        onKeyDown={(e) => { if (e.key === 'Enter') handlePriceSave(menu); }}
-                                                        className="w-20 outline-none text-[#C8843B] font-bold text-lg text-center"
-                                                        autoFocus
-                                                    />
-                                                    <button onClick={() => handlePriceSave(menu)} className="p-1 hover:bg-green-50 text-green-600 rounded">
-                                                        <Check className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => setEditingPrice({ menuId: null, priceType: null, value: '' })} className="p-1 hover:bg-red-50 text-red-500 rounded">
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                            {menu.portion_type === 'varied' ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <p className="text-xl font-bold text-[#C8843B]">
+                                                        <span className="text-sm">S:</span> Rs. {Number(menu.price_small || 0).toFixed(2)}
+                                                        <span className="mx-2 text-gray-300">|</span>
+                                                        <span className="text-sm">L:</span> Rs. {Number(menu.price_large || 0).toFixed(2)}
+                                                    </p>
+                                                    <p className="text-[10px] uppercase font-bold text-[#2E1A12]/60 tracking-wider mt-1">Small / Large</p>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <p className="text-2xl font-bold text-[#C8843B]">Rs. {Number(menu.price || 0).toFixed(2)}</p>
-                                                    <button 
-                                                        onClick={() => setEditingPrice({ menuId: menu.id, priceType: 'price', value: menu.price })}
-                                                        className="p-1.5 text-[#C8843B]/60 hover:text-[#C8843B] hover:bg-[#C8843B]/10 rounded opacity-0 group-hover:opacity-100 transition-all"
-                                                        title="Edit Price"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                                <>
+                                                    {editingPrice.menuId === menu.id && editingPrice.priceType === 'price' ? (
+                                                        <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-[#C8843B]/40 shadow-sm">
+                                                            <span className="text-[#C8843B] font-bold">Rs.</span>
+                                                            <input 
+                                                                type="number" 
+                                                                min="0"
+                                                                value={editingPrice.value} 
+                                                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                                                                onKeyDown={(e) => { if (e.key === 'Enter') handlePriceSave(menu); }}
+                                                                className="w-20 outline-none text-[#C8843B] font-bold text-lg text-center"
+                                                                autoFocus
+                                                            />
+                                                            <button onClick={() => handlePriceSave(menu)} className="p-1 hover:bg-green-50 text-green-600 rounded">
+                                                                <Check className="w-4 h-4" />
+                                                            </button>
+                                                            <button onClick={() => setEditingPrice({ menuId: null, priceType: null, value: '' })} className="p-1 hover:bg-red-50 text-red-500 rounded">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <p className="text-2xl font-bold text-[#C8843B]">Rs. {Number(menu.price || 0).toFixed(2)}</p>
+                                                            <button 
+                                                                onClick={() => setEditingPrice({ menuId: menu.id, priceType: 'price', value: menu.price })}
+                                                                className="p-1.5 text-[#C8843B]/60 hover:text-[#C8843B] hover:bg-[#C8843B]/10 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                                                title="Edit Price"
+                                                            >
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    <p className="text-[10px] uppercase font-bold text-[#2E1A12]/60 tracking-wider mt-1">Regular Price</p>
+                                                </>
                                             )}
-                                            <p className="text-[10px] uppercase font-bold text-[#2E1A12]/60 tracking-wider mt-1">Regular Price</p>
                                         </div>
                                     </div>
                             </div>

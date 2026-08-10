@@ -298,7 +298,7 @@ const Profile = () => {
                                                                 <li key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
                                                                     <span className="flex items-center gap-2">
                                                                         <span className="w-5 h-5 bg-[#C8843B]/10 text-[#C8843B] rounded flex items-center justify-center text-[10px] font-bold">{item.quantity}x</span>
-                                                                        {item.name}
+                                                                        {item.item_name || item.menu_name || item.product_name || item.beverage_name || 'Unknown Item'}
                                                                     </span>
                                                                     <span className="text-gray-500 text-xs font-bold">Rs. {(item.price * item.quantity).toLocaleString()}</span>
                                                                 </li>

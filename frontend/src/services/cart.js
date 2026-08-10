@@ -28,3 +28,22 @@ export function clearCart() {
   localStorage.removeItem('cart');
   window.dispatchEvent(new Event('cartUpdate'));
 }
+
+export function updateCartItemQuantity(itemId, quantity) {
+  const items = getCart();
+  const index = items.findIndex(i => i.id === itemId);
+  if (index !== -1) {
+    if (quantity <= 0) {
+      items.splice(index, 1);
+    } else {
+      items[index].quantity = quantity;
+    }
+    saveCart(items);
+  }
+}
+
+export function removeCartItem(itemId) {
+  const items = getCart();
+  const updatedItems = items.filter(i => i.id !== itemId);
+  saveCart(updatedItems);
+}

@@ -20,13 +20,14 @@ const placeOrder = async (req, res) => {
 
         // Create order items
         for (const item of items) {
-            // item can be a product or a menu
+            // item can be a product, menu, or beverage
             const productId = item.productId || null;
             const menuId = item.menuId || null;
+            const beverageId = item.beverageId || null;
 
             await pool.query(
-                'INSERT INTO order_items (order_id, product_id, menu_id, quantity, price) VALUES (?, ?, ?, ?, ?)',
-                [orderId, productId, menuId, item.quantity, item.price]
+                'INSERT INTO order_items (order_id, product_id, menu_id, beverage_id, item_name, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [orderId, productId, menuId, beverageId, item.name || null, item.quantity, item.price]
             );
         }
 
@@ -49,10 +50,11 @@ const getAllOrders = async (req, res) => {
         // Fetch items for each order
         for (let order of orders) {
             const [items] = await pool.query(`
-                SELECT oi.*, p.name as product_name, m.name as menu_name
+                SELECT oi.*, p.name as product_name, m.name as menu_name, b.name as beverage_name
                 FROM order_items oi
                 LEFT JOIN products p ON oi.product_id = p.id
                 LEFT JOIN dishes m ON oi.menu_id = m.id
+                LEFT JOIN beverages b ON oi.beverage_id = b.id
                 WHERE oi.order_id = ?
             `, [order.id]);
             order.items = items;
@@ -76,10 +78,11 @@ const getMyOrders = async (req, res) => {
 
         for (let order of orders) {
             const [items] = await pool.query(`
-                SELECT oi.*, p.name as product_name, m.name as menu_name
+                SELECT oi.*, p.name as product_name, m.name as menu_name, b.name as beverage_name
                 FROM order_items oi
                 LEFT JOIN products p ON oi.product_id = p.id
                 LEFT JOIN dishes m ON oi.menu_id = m.id
+                LEFT JOIN beverages b ON oi.beverage_id = b.id
                 WHERE oi.order_id = ?
             `, [order.id]);
             order.items = items;
