@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getCart, addToCart, clearCart } from '../../services/cart';
+import { getCart, addToCart, clearCart, updateCartItemQuantity, removeCartItem } from '../../services/cart';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import ScrollReveal from '../../components/ScrollReveal';
 import toast from 'react-hot-toast';
-import { ShoppingBag, CreditCard, Trash2, ArrowRight, Utensils, Package } from 'lucide-react';
+import { ShoppingBag, CreditCard, Trash2, ArrowRight, Utensils, Package, Plus, Minus } from 'lucide-react';
 import api from '../../services/api';
 
 const Order = () => {
@@ -45,23 +45,37 @@ const Order = () => {
         setLoading(true);
         try {
             const formattedItems = items.map(item => {
-                let productId = item.productId || null;
-                let menuId = item.menuId || null;
+                let productId = null;
+                let menuId = null;
+                let beverageId = null;
                 
                 // Try to infer from string IDs
                 if (typeof item.id === 'string') {
-                    if (item.id.includes('-M') || item.id.includes('menu-')) {
-                        const match = item.id.match(/M(\d+)/) || item.id.match(/menu-(\d+)/);
+                    if (item.id.includes('B')) {
+                        const match = item.id.match(/B(\d+)/);
+                        if (match) beverageId = parseInt(match[1]);
+                    } else if (item.id.includes('M')) {
+                        const match = item.id.match(/M(\d+)/);
                         if (match) menuId = parseInt(match[1]);
-                    } else if (item.id.includes('product-')) {
-                        const match = item.id.match(/product-(\d+)/);
+                    } else if (item.id.includes('P')) {
+                        const match = item.id.match(/P(\d+)/);
                         if (match) productId = parseInt(match[1]);
+                    } else {
+                        const match = item.id.match(/menu-(\d+)/) || item.id.match(/product-(\d+)/);
+                        if (match && item.id.includes('menu-')) menuId = parseInt(match[1]);
+                        else if (match && item.id.includes('product-')) productId = parseInt(match[1]);
                     }
+                } else {
+                    menuId = parseInt(item.menuId) || null;
+                    productId = parseInt(item.productId) || null;
+                    beverageId = parseInt(item.beverageId) || null;
                 }
                 
                 return {
                     productId,
                     menuId,
+                    beverageId,
+                    name: item.name,
                     quantity: item.quantity || 1,
                     price: item.price
                 };
@@ -134,9 +148,40 @@ const Order = () => {
                                         delay={idx * 100}
                                     >
                                         <div className="bg-white rounded-2xl p-5 shadow-[0_8px_20px_rgba(46,26,18,0.02)] border border-[#f0e6d8]/40 flex items-center justify-between gap-6 hover:shadow-md transition-shadow">
-                                            <div>
+                                            <div className="flex-1">
                                                 <h4 className="font-bold text-[#2E1A12] text-sm font-serif">{it.name}</h4>
-                                                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mt-1">Quantity: {it.quantity}</p>
+                                                <div className="flex items-center gap-3 mt-3">
+                                                    <div className="flex items-center gap-2 bg-[#F7F4ED] rounded-lg p-1 border border-[#e6dfd5]">
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateCartItemQuantity(it.id, (it.quantity || 1) - 1);
+                                                                setItems(getCart());
+                                                            }}
+                                                            className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-gray-500 hover:text-[#2E1A12] hover:shadow-sm transition-all"
+                                                        >
+                                                            <Minus className="w-3 h-3" />
+                                                        </button>
+                                                        <span className="text-xs font-bold text-[#2E1A12] min-w-[20px] text-center">{it.quantity || 1}</span>
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateCartItemQuantity(it.id, (it.quantity || 1) + 1);
+                                                                setItems(getCart());
+                                                            }}
+                                                            className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-gray-500 hover:text-[#2E1A12] hover:shadow-sm transition-all"
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            removeCartItem(it.id);
+                                                            setItems(getCart());
+                                                        }}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="font-extrabold text-[#C8843B] text-base">Rs. {(it.price || 0) * (it.quantity || 1)}</div>

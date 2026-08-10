@@ -9,7 +9,7 @@ import Footer from '../../components/Footer';
 import ScrollReveal from '../../components/ScrollReveal';
 import { 
     Search, Info, ShoppingCart, ShoppingBag, 
-    ChevronRight, Compass, ShieldCheck, HelpCircle, Leaf, QrCode
+    ChevronRight, Compass, ShieldCheck, HelpCircle, Leaf, QrCode, X
 } from 'lucide-react';
 import { wijayasiriMenuData, mockMenuCategories } from '../../data/mockMenus';
 
@@ -20,6 +20,7 @@ const Menus = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const location = useLocation();
     const [scannedTable, setScannedTable] = useState(null);
+    const [sizeSelectModal, setSizeSelectModal] = useState({ isOpen: false, item: null, action: null });
 
     // Capture table number from URL on load
     useEffect(() => {
@@ -40,21 +41,60 @@ const Menus = () => {
     useEffect(() => {
         const fetchMenus = async () => {
             try {
-                const { data } = await api.get('/menus');
-                if (data && data.length > 0) {
-                    const activeMenus = data.filter(item => (item.status || '').toLowerCase() === 'active');
-                    const mapped = activeMenus.map(item => ({
-                        code: `M${item.id}`,
-                        name: item.name,
-                        description: item.description,
-                        price: item.price,
-                        category: item.category_name || 'General',
-                        image_url: item.image_url // Assuming it has image
-                    }));
-                    setMenuItems(mapped);
+                let allItems = [];
+                
+                // Fetch Food Menus
+                try {
+                    const { data } = await api.get('/menus');
+                    if (data && data.length > 0) {
+                        const activeMenus = data.filter(item => (item.status || '').toLowerCase() === 'active');
+                        const mappedMenus = activeMenus.map(item => ({
+                            code: `M${item.id}`,
+                            name: item.name,
+                            description: item.description,
+                            price: item.price,
+                            category: item.category_name || 'General',
+                            image_url: item.image_url,
+                            is_available: item.is_available,
+                            status: item.status,
+                            portion_type: item.portion_type,
+                            price_small: item.price_small,
+                            price_large: item.price_large
+                        }));
+                        allItems = [...allItems, ...mappedMenus];
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch menus from API", err);
                 }
+
+                // Fetch Beverages
+                try {
+                    const { data: bevData } = await api.get('/beverages');
+                    if (bevData && bevData.length > 0) {
+                        const activeBevs = bevData.filter(item => (item.status || '').toLowerCase() === 'active');
+                        const mappedBevs = activeBevs.map(item => ({
+                            code: `B${item.id}`,
+                            name: item.name,
+                            description: item.description,
+                            price: item.price,
+                            category: item.category_name || 'Beverages',
+                            image_url: item.image_url,
+                            is_available: item.is_available,
+                            status: item.status,
+                            portion_type: item.portion_type || 'standard',
+                            price_small: item.price_small,
+                            price_large: item.price_large,
+                            price_variants: typeof item.price_variants === 'string' ? JSON.parse(item.price_variants) : item.price_variants
+                        }));
+                        allItems = [...allItems, ...mappedBevs];
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch beverages from API", err);
+                }
+
+                setMenuItems(allItems);
             } catch (err) {
-                console.error("Failed to fetch menus from API", err);
+                console.error("Failed to fetch data", err);
             }
         };
         fetchMenus();
@@ -88,6 +128,11 @@ const Menus = () => {
             return;
         }
 
+        if (item.portion_type === 'varied' || item.portion_type === 'bottles') {
+            setSizeSelectModal({ isOpen: true, item, action: 'cart' });
+            return;
+        }
+
         const itemId = `wijayasiri-${item.code}`;
         const finalName = item.name;
         const finalPrice = item.price || 0;
@@ -111,6 +156,11 @@ const Menus = () => {
             return;
         }
 
+        if (item.portion_type === 'varied' || item.portion_type === 'bottles') {
+            setSizeSelectModal({ isOpen: true, item, action: 'buy' });
+            return;
+        }
+
         const itemId = `wijayasiri-${item.code}`;
         const finalName = item.name;
         const finalPrice = item.price || 0;
@@ -123,6 +173,42 @@ const Menus = () => {
         };
 
         navigate('/order', { state: { menu: orderItem } });
+    };
+
+    // Handle size selection from modal
+    const handleSizeSelection = (variant) => {
+        const { item, action } = sizeSelectModal;
+        let sizeId = '';
+        let sizeName = '';
+        let finalPrice = 0;
+
+        if (typeof variant === 'string') {
+            sizeId = variant;
+            sizeName = variant === 'small' ? 'Small' : 'Large';
+            finalPrice = variant === 'small' ? item.price_small : item.price_large;
+        } else {
+            sizeId = variant.size.replace(/\s+/g, '-').toLowerCase();
+            sizeName = variant.size;
+            finalPrice = variant.price;
+        }
+
+        const itemId = `wijayasiri-${item.code}-${sizeId}`;
+        const finalName = `${item.name} (${sizeName})`;
+
+        const payloadItem = {
+            id: itemId,
+            name: finalName,
+            price: finalPrice || 0,
+            quantity: 1
+        };
+
+        if (action === 'cart') {
+            addToCart(payloadItem);
+            toast.success(`Added ${finalName} to cart!`, { icon: '🛒' });
+        } else {
+            navigate('/order', { state: { menu: payloadItem } });
+        }
+        setSizeSelectModal({ isOpen: false, item: null, action: null });
     };
 
     // Category count helper
@@ -268,13 +354,18 @@ const Menus = () => {
                                             {/* Top Card Area */}
                                             <div className="p-6 space-y-4">
                                                 <div className="flex justify-between items-start gap-4">
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="text-[10px] font-black text-[#C8843B] bg-[#FDF6ED] px-2.5 py-1 rounded-xl border border-[#C8843B]/10 shadow-sm">
                                                             Code: {item.code}
                                                         </span>
                                                         <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
                                                             {item.category}
                                                         </span>
+                                                        {(!item.is_available || item.status !== 'active') && (
+                                                            <span className="text-[9px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg border border-red-100 uppercase tracking-wider">
+                                                                Out of Stock
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -294,26 +385,48 @@ const Menus = () => {
                                                 {/* Price & Action Row */}
                                                 <div className="flex items-center justify-between border-t border-[#F7F4ED] pt-4 mt-2">
                                                     <div>
-                                                        <div className="text-[9px] text-gray-400 font-black uppercase tracking-wider">Price</div>
+                                                        <div className="text-[9px] text-gray-400 font-black uppercase tracking-wider">{item.portion_type === 'varied' ? 'Small / Large' : 'Price'}</div>
                                                         <div className="text-xl font-black text-[#C8843B] transition-all duration-300">
-                                                            Rs. {(finalPrice || 0).toLocaleString()}
+                                                            {item.portion_type === 'varied' ? (
+                                                                <div className="flex gap-2">
+                                                                    <span className="text-gray-700">
+                                                                        <span className="text-xs text-gray-400 font-bold mr-1">S:</span> Rs. {(item.price_small || 0).toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-gray-700">
+                                                                        <span className="text-xs text-gray-400 font-bold mr-1">L:</span> Rs. {(item.price_large || 0).toLocaleString()}
+                                                                    </span>
+                                                                </div>
+                                                            ) : item.portion_type === 'bottles' && item.price_variants && item.price_variants.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] leading-tight">
+                                                                    {item.price_variants.map((v, i) => (
+                                                                        <span key={i} className="text-gray-700 whitespace-nowrap">
+                                                                            <span className="text-gray-400 font-bold mr-1">{v.size}:</span> 
+                                                                            Rs. {(Number(v.price) || 0).toLocaleString()}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                `Rs. ${(finalPrice || 0).toLocaleString()}`
+                                                            )}
                                                         </div>
                                                     </div>
 
                                                     <div className="flex gap-2 shrink-0">
                                                         <button
                                                             onClick={() => handleAddToCart(item)}
-                                                            className="p-3 bg-[#F7F4ED] text-[#C8843B] hover:bg-[#C8843B] hover:text-white rounded-2xl shadow-sm transition-all duration-300 cursor-pointer"
-                                                            title="Add to Cart"
+                                                            disabled={!item.is_available || item.status !== 'active'}
+                                                            className={`p-3 rounded-2xl shadow-sm transition-all duration-300 ${(!item.is_available || item.status !== 'active') ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#F7F4ED] text-[#C8843B] hover:bg-[#C8843B] hover:text-white cursor-pointer'}`}
+                                                            title={(!item.is_available || item.status !== 'active') ? "Currently Unavailable" : "Add to Cart"}
                                                         >
                                                             <ShoppingCart className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => handleBuyItem(item)}
-                                                            className="flex items-center gap-1.5 bg-[#2E1A12] hover:bg-[#C8843B] text-white font-black text-xs px-4 py-3 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                                                            disabled={!item.is_available || item.status !== 'active'}
+                                                            className={`flex items-center gap-1.5 font-black text-xs px-4 py-3 rounded-2xl shadow-sm transition-all duration-300 ${(!item.is_available || item.status !== 'active') ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#2E1A12] hover:bg-[#C8843B] text-white hover:shadow-md cursor-pointer'}`}
                                                         >
-                                                            <ShoppingBag className="w-3.5 h-3.5 text-[#C8843B]" />
-                                                            <span>Order</span>
+                                                            <ShoppingBag className={`w-3.5 h-3.5 ${(!item.is_available || item.status !== 'active') ? 'text-gray-400' : 'text-[#C8843B]'}`} />
+                                                            <span>{(!item.is_available || item.status !== 'active') ? 'Unavailable' : 'Order'}</span>
                                                         </button>
                                                     </div>
                                                 </div>
@@ -343,6 +456,57 @@ const Menus = () => {
                 </div>
             </div>
             <Footer />
+
+            {/* Size Selection Modal */}
+            {sizeSelectModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2E1A12]/60 backdrop-blur-sm p-4">
+                    <ScrollReveal variant="fade-up" duration={400} className="w-full max-w-sm">
+                        <div className="bg-white p-6 rounded-[32px] shadow-2xl border border-[#C8843B]/20 w-full relative">
+                            <button 
+                                onClick={() => setSizeSelectModal({ isOpen: false, item: null, action: null })}
+                                className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            
+                            <h3 className="text-xl font-extrabold text-[#2E1A12] font-serif mb-1 pr-8">Select Portion Size</h3>
+                            <p className="text-sm font-semibold text-gray-500 mb-6">{sizeSelectModal.item?.name}</p>
+                            
+                            <div className="space-y-3">
+                                                                {sizeSelectModal.item?.portion_type === 'bottles' && sizeSelectModal.item?.price_variants ? (
+                                                                    sizeSelectModal.item.price_variants.map((variant, idx) => (
+                                                                        <button 
+                                                                            key={idx}
+                                                                            onClick={() => handleSizeSelection(variant)}
+                                                                            className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#C8843B]/10 hover:border-[#C8843B] hover:bg-[#C8843B]/5 transition-all text-left group"
+                                                                        >
+                                                                            <span className="font-extrabold text-[#2E1A12] group-hover:text-[#C8843B] transition-colors">{variant.size}</span>
+                                                                            <span className="font-black text-[#C8843B] bg-[#C8843B]/10 px-3 py-1 rounded-xl">Rs. {(Number(variant.price) || 0).toLocaleString()}</span>
+                                                                        </button>
+                                                                    ))
+                                                                ) : (
+                                                                    <>
+                                                                        <button 
+                                                                            onClick={() => handleSizeSelection('small')}
+                                                                            className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#C8843B]/10 hover:border-[#C8843B] hover:bg-[#C8843B]/5 transition-all text-left group"
+                                                                        >
+                                                                            <span className="font-extrabold text-[#2E1A12] group-hover:text-[#C8843B] transition-colors">Small Portion</span>
+                                                                            <span className="font-black text-[#C8843B] bg-[#C8843B]/10 px-3 py-1 rounded-xl">Rs. {(sizeSelectModal.item?.price_small || 0).toLocaleString()}</span>
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleSizeSelection('large')}
+                                                                            className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#C8843B]/10 hover:border-[#C8843B] hover:bg-[#C8843B]/5 transition-all text-left group"
+                                                                        >
+                                                                            <span className="font-extrabold text-[#2E1A12] group-hover:text-[#C8843B] transition-colors">Large Portion</span>
+                                                                            <span className="font-black text-[#C8843B] bg-[#C8843B]/10 px-3 py-1 rounded-xl">Rs. {(sizeSelectModal.item?.price_large || 0).toLocaleString()}</span>
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                            </div>
+                        </div>
+                    </ScrollReveal>
+                </div>
+            )}
         </div>
     );
 };

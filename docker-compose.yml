@@ -8,7 +8,7 @@ services:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: smart_bake_hub
     volumes:
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/schema_utf8.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3307:3306"
     restart: unless-stopped
@@ -28,7 +28,7 @@ services:
       - JWT_SECRET=your_jwt_secret_here
       - GEMINI_API_KEY=your_gemini_api_key_here
       - EMAIL_USER=wijayabakehouse@gmail.com
-      - "EMAIL_PASS=ejjg jovn wzld tnrl"
+      - EMAIL_PASS=ejjg jovn wzld tnrl
     ports:
       - "5000:5000"
     depends_on:

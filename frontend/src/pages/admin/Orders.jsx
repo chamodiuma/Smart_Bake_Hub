@@ -8,6 +8,7 @@ const Orders = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
+    const [expandedOrder, setExpandedOrder] = useState(null);
 
     useEffect(() => {
         fetchOrders();
@@ -121,51 +122,80 @@ const Orders = () => {
                             </thead>
                             <tbody className="divide-y divide-[#C8843B]/5">
                                 {filteredOrders.map((order) => (
-                                    <tr key={order.id} className="hover:bg-[#FDF6ED]/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm font-bold text-[#2E1A12]">#{order.id}</span>
-                                            <div className="text-[10px] text-gray-500 mt-1">
-                                                {new Date(order.created_at).toLocaleString()}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-semibold text-[#2E1A12]">{order.customer_name}</div>
-                                            <div className="text-xs text-gray-500">{order.customer_email}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-xs font-semibold capitalize text-[#2E1A12] bg-gray-100 px-2 py-1 rounded-md flex items-center gap-1 w-max">
-                                                {order.order_type}
-                                                {order.table_number && <span className="text-[#C8843B]"> (Table {order.table_number})</span>}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm font-bold text-[#C8843B]">
-                                                Rs. {parseFloat(order.total_amount).toLocaleString()}
-                                            </span>
-                                            <div className="text-[10px] text-gray-500 mt-1">
-                                                {order.items?.length || 0} items
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(order.status)}`}>
-                                                {order.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => updateStatus(order.id, e.target.value)}
-                                                className="bg-white border border-[#C8843B]/20 rounded-lg text-xs py-1.5 px-3 focus:outline-none focus:border-[#C8843B]"
-                                            >
-                                                <option value="pending">Pending</option>
-                                                <option value="accepted">Accepted</option>
-                                                <option value="preparing">Preparing</option>
-                                                <option value="ready">Ready</option>
-                                                <option value="completed">Completed</option>
-                                                <option value="cancelled">Cancelled</option>
-                                            </select>
-                                        </td>
-                                    </tr>
+                                    <React.Fragment key={order.id}>
+                                        <tr className="hover:bg-[#FDF6ED]/50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-sm font-bold text-[#2E1A12]">#{order.id}</span>
+                                                <div className="text-[10px] text-gray-500 mt-1">
+                                                    {new Date(order.created_at).toLocaleString()}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm font-semibold text-[#2E1A12]">{order.customer_name}</div>
+                                                <div className="text-xs text-gray-500">{order.customer_email}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-xs font-semibold capitalize text-[#2E1A12] bg-gray-100 px-2 py-1 rounded-md flex items-center gap-1 w-max">
+                                                    {order.order_type}
+                                                    {order.table_number && <span className="text-[#C8843B]"> (Table {order.table_number})</span>}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-sm font-bold text-[#C8843B]">
+                                                    Rs. {parseFloat(order.total_amount).toLocaleString()}
+                                                </span>
+                                                <div className="text-[10px] text-gray-500 mt-1">
+                                                    {order.items?.length || 0} items
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(order.status)}`}>
+                                                    {order.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm flex gap-2 items-center">
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => updateStatus(order.id, e.target.value)}
+                                                    className="bg-white border border-[#C8843B]/20 rounded-lg text-xs py-1.5 px-3 focus:outline-none focus:border-[#C8843B]"
+                                                >
+                                                    <option value="pending">Pending</option>
+                                                    <option value="accepted">Accepted</option>
+                                                    <option value="preparing">Preparing</option>
+                                                    <option value="ready">Ready</option>
+                                                    <option value="completed">Completed</option>
+                                                    <option value="cancelled">Cancelled</option>
+                                                </select>
+                                                <button 
+                                                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                                                    className="p-1.5 text-gray-500 hover:text-[#C8843B] bg-gray-100 hover:bg-[#FDF6ED] rounded-lg transition-colors border border-transparent hover:border-[#C8843B]/20"
+                                                    title="View Details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {expandedOrder === order.id && (
+                                            <tr className="bg-gray-50/50">
+                                                <td colSpan="6" className="px-6 py-4">
+                                                    <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Order Items</h4>
+                                                        <ul className="space-y-2">
+                                                            {order.items?.map((item, idx) => (
+                                                                <li key={idx} className="flex justify-between items-center text-sm">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="w-6 h-6 rounded bg-[#C8843B]/10 text-[#C8843B] flex items-center justify-center font-bold text-xs">{item.quantity}x</span>
+                                                                        <span className="font-semibold text-[#2E1A12]">{item.item_name || item.product_name || item.menu_name || item.beverage_name || 'Unknown Item'}</span>
+                                                                    </div>
+                                                                    <div className="text-gray-500 font-medium">Rs. {(item.price * item.quantity).toLocaleString()}</div>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>

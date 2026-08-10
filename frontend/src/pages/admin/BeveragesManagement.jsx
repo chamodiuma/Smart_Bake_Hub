@@ -17,6 +17,7 @@ const BeveragesManagement = () => {
     const [togglingBeverageId, setTogglingBeverageId] = useState(null);
     const [togglingAvailabilityId, setTogglingAvailabilityId] = useState(null);
     const [editingPrice, setEditingPrice] = useState({ beverageId: null, priceType: null, value: '' });
+    const [deletingBeverage, setDeletingBeverage] = useState(null);
 
     // Fetch Beverages Data
     const fetchBeveragesData = async () => {
@@ -98,6 +99,18 @@ const BeveragesManagement = () => {
         }
     };
 
+    const handleDeleteBeverage = async (id) => {
+        try {
+            await api.delete(`/beverages/${id}`);
+            setBeverages(beverages.filter(b => b.id !== id));
+            toast.success('Beverage deleted successfully');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete beverage');
+        } finally {
+            setDeletingBeverage(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -171,8 +184,15 @@ const BeveragesManagement = () => {
                                     <h3 className="font-bold text-lg font-serif leading-tight">{beverage.name}</h3>
                                     <p className="text-xs text-white/80 mt-2 font-semibold tracking-wide">{beverage.beverage_code || 'NO CODE'}</p>
                                 </div>
-                                <div className="text-right flex-shrink-0">
+                                <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
                                     <p className="font-bold text-sm">{beverage.beverage_category_name || 'N/A'}</p>
+                                    <button
+                                        onClick={() => setDeletingBeverage(beverage)}
+                                        className="p-1.5 bg-red-500/20 hover:bg-red-500/40 text-white rounded-lg transition-all"
+                                        title="Delete Beverage"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
 
@@ -275,6 +295,16 @@ const BeveragesManagement = () => {
                 </div>
             )}
 
+            {deletingBeverage && (
+                <DeleteConfirmation
+                    isOpen={!!deletingBeverage}
+                    onClose={() => setDeletingBeverage(null)}
+                    onConfirm={() => handleDeleteBeverage(deletingBeverage.id)}
+                    title="Delete Beverage"
+                    message={`Are you sure you want to delete "${deletingBeverage.name}"? This action cannot be undone.`}
+                    itemName={deletingBeverage.name}
+                />
+            )}
 
         </div>
     );
