@@ -1,26 +1,57 @@
 const pool = require('../config/db');
 
 const placeOrder = async (req, res) => {
-    const { items, order_type } = req.body;
+    const { items, order_type, special_note } = req.body;
     const userId = req.user.id;
 
     if (!items || items.length === 0) {
         return res.status(400).json({ message: 'Order items cannot be empty' });
     }
 
+    const { append_to_order_id } = req.body;
+
     try {
         const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        let orderId = null;
+        let isAppended = false;
 
-        // Create order
-        const [orderResult] = await pool.query(
-            'INSERT INTO orders (user_id, total_amount, order_type, table_number, status) VALUES (?, ?, ?, ?, ?)',
-            [userId, totalAmount, order_type || 'takeaway', req.body.table_number || null, 'pending']
-        );
-        const orderId = orderResult.insertId;
+        // Check if we should append to an existing order
+        if (append_to_order_id) {
+            const [existingOrders] = await pool.query(
+                'SELECT id, status, special_note FROM orders WHERE id = ? AND user_id = ? AND status = "pending" AND created_at >= NOW() - INTERVAL 5 MINUTE',
+                [append_to_order_id, userId]
+            );
+
+            if (existingOrders.length > 0) {
+                orderId = existingOrders[0].id;
+                isAppended = true;
+                const oldNote = existingOrders[0].special_note;
+                
+                // Combine notes if there's a new one
+                let newNote = oldNote;
+                if (special_note) {
+                    newNote = oldNote ? `${oldNote} | ${special_note}` : special_note;
+                }
+
+                // Update total amount and note
+                await pool.query(
+                    'UPDATE orders SET total_amount = total_amount + ?, special_note = ? WHERE id = ?',
+                    [totalAmount, newNote, orderId]
+                );
+            }
+        }
+
+        // Create new order if appending failed or wasn't requested
+        if (!isAppended) {
+            const [orderResult] = await pool.query(
+                'INSERT INTO orders (user_id, total_amount, order_type, table_number, status, special_note) VALUES (?, ?, ?, ?, ?, ?)',
+                [userId, totalAmount, order_type || 'takeaway', req.body.table_number || null, 'pending', special_note || null]
+            );
+            orderId = orderResult.insertId;
+        }
 
         // Create order items
         for (const item of items) {
-            // item can be a product, menu, or beverage
             const productId = item.productId || null;
             const menuId = item.menuId || null;
             const beverageId = item.beverageId || null;
@@ -31,7 +62,21 @@ const placeOrder = async (req, res) => {
             );
         }
 
-        res.status(201).json({ message: 'Order placed successfully', orderId });
+        // Insert Notification for Admin
+        if (isAppended) {
+            await pool.query(
+                'INSERT INTO notifications (title, message, type) VALUES (?, ?, ?)',
+                [`Order #${orderId} Updated`, `Customer appended new items for Rs. ${totalAmount.toFixed(2)}.`, 'order']
+            );
+            res.status(201).json({ message: 'Order updated successfully', appendedOrderId: orderId });
+        } else {
+            await pool.query(
+                'INSERT INTO notifications (title, message, type) VALUES (?, ?, ?)',
+                [`New Order #${orderId}`, `A customer has placed a new ${order_type || 'takeaway'} order for Rs. ${totalAmount.toFixed(2)}.`, 'order']
+            );
+            res.status(201).json({ message: 'Order placed successfully', orderId });
+        }
+
     } catch (error) {
         console.error('Error placing order:', error);
         res.status(500).json({ message: 'Internal server error' });

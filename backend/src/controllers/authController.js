@@ -240,33 +240,43 @@ const forgotPassword = async (req, res) => {
             return res.status(404).json({ message: 'User with this email does not exist' });
         }
 
-        const resetToken = crypto.randomBytes(32).toString('hex');
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const tokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
         await pool.query(
             'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE email = ?',
-            [resetToken, tokenExpiry, email]
+            [otp, tokenExpiry, email]
         );
 
-        const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
-        console.log(`\n=========================================\nPASSWORD RESET LINK for ${email}:\n${resetUrl}\n=========================================\n`);
+        const emailSent = await sendOtpEmail(email, otp);
+        if (!emailSent) {
+            console.log(`\n=========================================\n[FALLBACK] PASSWORD RESET OTP FOR ${email} IS: [ ${otp} ]\n=========================================\n`);
+        }
 
-        res.json({ message: 'Password reset link simulated! Check server console log.' });
+        res.json({ 
+            message: 'An OTP has been sent to your email to reset your password.',
+            devOtp: !emailSent ? otp : null
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 const resetPassword = async (req, res) => {
-    const { token, newPassword } = req.body;
+    const { email, otp, newPassword } = req.body;
+    
+    if (!email || !otp || !newPassword) {
+        return res.status(400).json({ message: 'Email, OTP and New Password are required' });
+    }
+
     try {
         const [users] = await pool.query(
-            'SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
-            [token]
+            'SELECT * FROM users WHERE email = ? AND reset_token = ? AND reset_token_expires > NOW()',
+            [email, otp]
         );
 
         if (users.length === 0) {
-            return res.status(400).json({ message: 'Invalid or expired reset token' });
+            return res.status(400).json({ message: 'Invalid or expired OTP code' });
         }
 
         const user = users[0];

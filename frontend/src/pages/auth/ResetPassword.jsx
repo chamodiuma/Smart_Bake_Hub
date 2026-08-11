@@ -1,31 +1,40 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { Lock, ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Lock, ArrowLeft, KeyRound, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { useEffect } from 'react';
 import ScrollReveal from '../../components/ScrollReveal';
 
 const ResetPassword = () => {
+    const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [searchParams] = useSearchParams();
+    const location = useLocation();
     const navigate = useNavigate();
-    const token = searchParams.get('token');
+    const email = location.state?.email;
+
+    useEffect(() => {
+        if (!email) {
+            toast.error('Please enter your email first');
+            navigate('/forgot-password');
+        }
+    }, [email, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (newPassword !== confirmPassword) {
             return toast.error('Passwords do not match');
         }
-        if (!token) {
-            return toast.error('Reset token is missing from the URL');
+        if (!otp || otp.length !== 6) {
+            return toast.error('Please enter a valid 6-digit OTP');
         }
 
         setLoading(true);
         try {
-            const { data } = await api.post('/auth/reset-password', { token, newPassword });
+            const { data } = await api.post('/auth/reset-password', { email, otp, newPassword });
             toast.success(data.message || 'Password reset successful!');
             navigate('/login');
         } catch (error) {
@@ -84,6 +93,18 @@ const ResetPassword = () => {
                         </div>
 
                         <form className="space-y-4" onSubmit={handleSubmit}>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <CheckCircle className="h-5 w-5 text-gray-400 group-focus-within:text-[#C8843B] transition-colors" strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type="text" required maxLength="6"
+                                    className="block w-full pl-11 pr-4 py-3.5 bg-[#FAFAFA] border border-gray-200 rounded-xl text-[#4A3C31] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#C8843B] focus:border-[#C8843B] transition-all text-sm font-medium tracking-[0.2em] text-center"
+                                    placeholder="Enter 6-Digit OTP"
+                                    value={otp} onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                                />
+                            </div>
+
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-[#C8843B] transition-colors" strokeWidth={1.5} />

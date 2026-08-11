@@ -15,6 +15,7 @@ import {
     Play, CheckCircle2, QrCode, Power, Printer, FileText, 
     AlertCircle, Send, Plus, Minus, Filter, Eye, Activity, RotateCcw
 } from 'lucide-react';
+import LogoutConfirmation from '../../components/LogoutConfirmation';
 
 const StaffDashboard = () => {
     const { user, logout } = useAuthStore();
@@ -23,11 +24,18 @@ const StaffDashboard = () => {
     // UI state
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [time, setTime] = useState(new Date());
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isInventoryDrawerOpen, setIsInventoryDrawerOpen] = useState(false);
     const [selectedInventoryProduct, setSelectedInventoryProduct] = useState(null);
     const [selectedChatUser, setSelectedChatUser] = useState(null);
     const [chatReplyText, setChatReplyText] = useState('');
+
+    const handleConfirmLogout = () => {
+        logout();
+        setShowLogoutModal(false);
+        navigate('/');
+    };
 
     // Dynamic Clock Heuristic
     useEffect(() => {
@@ -222,7 +230,7 @@ const StaffDashboard = () => {
                         )}
                         {!isSidebarCollapsed && (
                             <button 
-                                onClick={logout}
+                                onClick={() => setShowLogoutModal(true)}
                                 className="p-1 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg cursor-pointer transition-colors"
                                 title="Logout"
                             >
@@ -950,7 +958,12 @@ const StaffDashboard = () => {
                     </div>
                 </div>
             )}
-            
+
+            <LogoutConfirmation 
+                isOpen={showLogoutModal}
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutModal(false)}
+            />
         </div>
     );
 };

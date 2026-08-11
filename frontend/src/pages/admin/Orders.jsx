@@ -191,6 +191,12 @@ const Orders = () => {
                                                                 </li>
                                                             ))}
                                                         </ul>
+                                                        {order.special_note && (
+                                                            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                                <span className="block text-xs font-bold text-yellow-800 uppercase tracking-wider mb-1">Special Note:</span>
+                                                                <span className="text-sm font-semibold text-[#2E1A12]">{order.special_note}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

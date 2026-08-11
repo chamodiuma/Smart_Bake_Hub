@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { ShoppingCart, Menu as MenuIcon, X } from 'lucide-react';
+import LogoutConfirmation from './LogoutConfirmation';
 
 const Header = () => {
     const { user, logout } = useAuthStore();
     const location = useLocation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+    const handleConfirmLogout = () => {
+        logout();
+        setShowLogoutModal(false);
+        setMobileMenuOpen(false);
+    };
 
     const updateCartCount = () => {
         try {
@@ -77,7 +85,7 @@ const Header = () => {
                             <Link to="/profile" className="text-sm font-semibold text-[#2E1A12] hover:text-[#C8843B] transition-colors">
                                 {user.name}
                             </Link>
-                            <button onClick={logout} className="bg-[#2E1A12] text-white font-medium px-4 py-2 rounded-full text-xs hover:bg-[#C8843B] transition-colors cursor-pointer">
+                            <button onClick={() => setShowLogoutModal(true)} className="bg-[#2E1A12] text-white font-medium px-4 py-2 rounded-full text-xs hover:bg-[#C8843B] transition-colors cursor-pointer">
                                 Logout
                             </button>
                         </div>
@@ -117,10 +125,7 @@ const Header = () => {
                                     {user.name}
                                 </Link>
                                 <button 
-                                    onClick={() => {
-                                        logout();
-                                        setMobileMenuOpen(false);
-                                    }} 
+                                    onClick={() => setShowLogoutModal(true)} 
                                     className="bg-[#2E1A12] text-white font-medium px-4 py-2.5 rounded-full text-center text-xs hover:bg-[#C8843B] transition-colors w-full cursor-pointer"
                                 >
                                     Logout
@@ -138,6 +143,12 @@ const Header = () => {
                     </div>
                 </div>
             )}
+
+            <LogoutConfirmation 
+                isOpen={showLogoutModal}
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutModal(false)}
+            />
         </header>
     );
 };

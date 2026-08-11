@@ -4,8 +4,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
     User, Mail, Lock, Key, ArrowLeft, Shield, Save,
     ShoppingBag, Calendar as CalendarIcon, Settings,
-    Clock, Package, Utensils, ShoppingCart, LogOut, Store, Menu, Bell
+    Clock, Package, Utensils, ShoppingCart, LogOut, Store, Menu, Bell, ChevronRight
 } from 'lucide-react';
+import LogoutConfirmation from '../../components/LogoutConfirmation';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import ScrollReveal from '../../components/ScrollReveal';
@@ -25,6 +26,7 @@ const Profile = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     // Orders and Bookings state
     const [orders, setOrders] = useState([]);
@@ -107,8 +109,9 @@ const Profile = () => {
         }
     };
 
-    const handleLogout = () => {
+    const handleConfirmLogout = () => {
         logout();
+        setShowLogoutModal(false);
         navigate('/');
     };
 
@@ -238,7 +241,7 @@ const Profile = () => {
                                 <Settings className="w-5 h-5" />
                             </button>
 
-                            <button onClick={handleLogout} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition-colors" title="Logout">
+                            <button onClick={() => setShowLogoutModal(true)} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition-colors" title="Logout">
                                 <LogOut className="w-5 h-5" />
                             </button>
                         </div>
@@ -265,7 +268,16 @@ const Profile = () => {
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
-                                            {orders.map(order => (
+                                            {orders.map(order => {
+                                                const totalQuantity = order.items?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 0;
+                                                let prepTimeMinutes = 60;
+                                                if (totalQuantity >= 3 && totalQuantity <= 4) prepTimeMinutes = 90;
+                                                else if (totalQuantity > 4) prepTimeMinutes = 120;
+                                                
+                                                const readyTime = new Date(new Date(order.created_at).getTime() + prepTimeMinutes * 60000);
+                                                const isFinalStatus = ['ready', 'completed', 'cancelled'].includes(order.status);
+                                                
+                                                return (
                                                 <div key={order.id} className="border border-[#e6dfd5] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
                                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
                                                         <div>
@@ -284,12 +296,23 @@ const Profile = () => {
                                                             <div className="text-lg font-black text-[#C8843B]">Rs. {Number(order.total_amount).toLocaleString()}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2 mb-3">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Type:</span>
-                                                        <span className="text-xs font-semibold capitalize bg-gray-100 px-2 py-1 rounded-md text-gray-600 flex items-center gap-1">
-                                                            {order.order_type === 'dine-in' ? <Utensils className="w-3 h-3" /> : <Package className="w-3 h-3" />}
-                                                            {order.order_type}
-                                                        </span>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Type:</span>
+                                                            <span className="text-xs font-semibold capitalize bg-gray-100 px-2 py-1 rounded-md text-gray-600 flex items-center gap-1">
+                                                                {order.order_type === 'dine-in' ? <Utensils className="w-3 h-3" /> : <Package className="w-3 h-3" />}
+                                                                {order.order_type}
+                                                            </span>
+                                                        </div>
+                                                        {!isFinalStatus && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] font-bold text-[#C8843B] uppercase tracking-wider">Ready Time:</span>
+                                                                <span className="text-xs font-bold bg-[#C8843B]/10 text-[#C8843B] px-2 py-1 rounded-md flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {readyTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                                                         <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Items summary:</p>
@@ -306,7 +329,7 @@ const Profile = () => {
                                                         </ul>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            )})}
                                         </div>
                                     )}
                                 </div>
@@ -525,6 +548,12 @@ const Profile = () => {
                 </main>
             </div>
             
+            <LogoutConfirmation 
+                isOpen={showLogoutModal}
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutModal(false)}
+            />
+
             <style dangerouslySetInnerHTML={{__html: `
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 6px;
