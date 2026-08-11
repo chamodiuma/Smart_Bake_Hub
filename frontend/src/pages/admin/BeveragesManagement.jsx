@@ -260,7 +260,7 @@ const BeveragesManagement = () => {
                             </div>
 
                             {/* Footer */}
-                            <div className="grid grid-cols-2 gap-3 p-4 border-t border-[#C8843B]/20 bg-gray-50/50">
+                            <div className="grid grid-cols-3 gap-2 p-4 border-t border-[#C8843B]/20 bg-gray-50/50">
                                 <button
                                     onClick={() => handleToggleBeverageStatus(beverage)}
                                     disabled={togglingBeverageId === beverage.id}
@@ -289,6 +289,39 @@ const BeveragesManagement = () => {
                                     </div>
                                     {beverage.is_available ? 'Available' : 'Unavailable'}
                                 </button>
+                                
+                                {/* Discount Percent */}
+                                <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl px-1 py-1 shadow-sm">
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Discount %</span>
+                                    {editingPrice.beverageId === beverage.id && editingPrice.priceType === 'discount_percentage' ? (
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="number" 
+                                                min="0" max="100"
+                                                value={editingPrice.value} 
+                                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                                                className="w-10 outline-none text-[#C8843B] font-bold text-xs text-center border-b border-[#C8843B]"
+                                                autoFocus
+                                            />
+                                            <button onClick={() => handlePriceSave(beverage)} className="p-0.5 hover:bg-green-50 text-green-600 rounded">
+                                                <Check className="w-3 h-3" />
+                                            </button>
+                                            <button onClick={() => setEditingPrice({ beverageId: null, priceType: null, value: '' })} className="p-0.5 hover:bg-red-50 text-red-500 rounded">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div 
+                                            onClick={() => setEditingPrice({ beverageId: beverage.id, priceType: 'discount_percentage', value: beverage.discount_percentage || 0 })}
+                                            className="flex items-center justify-center gap-1 cursor-pointer group w-full hover:bg-gray-50 py-1 rounded"
+                                        >
+                                            <span className={`text-sm font-bold ${Number(beverage.discount_percentage) > 0 ? 'text-red-500' : 'text-gray-600'}`}>
+                                                {beverage.discount_percentage || 0}%
+                                            </span>
+                                            <Edit2 className="w-3 h-3 text-gray-300 group-hover:text-[#C8843B] transition-colors" />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))}

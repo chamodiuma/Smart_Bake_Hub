@@ -22,9 +22,9 @@ const Login = () => {
             login(data);
 
             if (data.role === 'admin' || data.role === 'staff') {
-                navigate('/admin');
+                window.location.href = '/admin';
             } else {
-                navigate('/profile');
+                window.location.href = '/profile';
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Login failed');

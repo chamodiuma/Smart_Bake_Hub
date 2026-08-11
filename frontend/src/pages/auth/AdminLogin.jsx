@@ -39,7 +39,7 @@ const AdminLogin = () => {
             
             login(data);
             toast.success('Welcome to the Admin Dashboard');
-            navigate('/admin');
+            window.location.href = '/admin';
         } catch (error) {
             toast.error(error.response?.data?.message || 'Login failed');
         }

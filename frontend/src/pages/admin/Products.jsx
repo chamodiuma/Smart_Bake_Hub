@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 
 const Products = () => {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [editingDiscount, setEditingDiscount] = useState({ id: null, value: '' });
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({ name: '', description: '', price: '', category_id: '', image: null });
@@ -28,6 +29,21 @@ const Products = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    
+    const handleDiscountSave = async (product) => {
+        try {
+            const payload = {
+                discount_percentage: editingDiscount.value
+            };
+            await api.put(`/products/${product.id}/discount`, payload);
+            setProducts(products.map(p => p.id === product.id ? { ...p, discount_percentage: editingDiscount.value } : p));
+            toast.success('Discount updated successfully');
+            setEditingDiscount({ id: null, value: '' });
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update discount');
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -81,6 +97,7 @@ const Products = () => {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discount %</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -105,6 +122,27 @@ const Products = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                                     ${product.price}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {editingDiscount.id === product.id ? (
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number" 
+                                                value={editingDiscount.value}
+                                                onChange={(e) => setEditingDiscount({ ...editingDiscount, value: e.target.value })}
+                                                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#C8843B]"
+                                            />
+                                            <button onClick={() => handleDiscountSave(product)} className="text-green-600 hover:bg-green-50 p-1 rounded"><Check className="w-4 h-4" /></button>
+                                            <button onClick={() => setEditingDiscount({ id: null, value: '' })} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-4 h-4" /></button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setEditingDiscount({ id: product.id, value: product.discount_percentage || 0 })}>
+                                            <span className={`font-semibold ${Number(product.discount_percentage) > 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                                {product.discount_percentage || 0}%
+                                            </span>
+                                            <Edit2 className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.availability === 'available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
