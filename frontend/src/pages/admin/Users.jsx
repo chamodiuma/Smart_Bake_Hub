@@ -188,7 +188,7 @@ const Users = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2E1A12]/80">{user.email}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {user.role === 'customer' || user.id === 1 ? (
+                                            {user.role === 'customer' || user.role === 'admin' ? (
                                                 <span className="text-sm font-medium text-[#2E1A12]/80 capitalize">{user.role}</span>
                                             ) : (
                                                 <select
@@ -203,10 +203,10 @@ const Users = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <button
-                                                onClick={() => user.role !== 'customer' && user.id !== 1 && updateStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
-                                                disabled={user.role === 'customer' || user.id === 1}
+                                                onClick={() => user.role !== 'customer' && user.role !== 'admin' && updateStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
+                                                disabled={user.role === 'customer' || user.role === 'admin'}
                                                 className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full items-center gap-1 transition-all ${
-                                                    user.role === 'customer' || user.id === 1 ? 'cursor-default opacity-80' : 'cursor-pointer'
+                                                    user.role === 'customer' || user.role === 'admin' ? 'cursor-default opacity-80' : 'cursor-pointer'
                                                 } ${
                                                     user.status === 'active' ? 'bg-green-50 text-green-700 hover:bg-green-100' : 
                                                     user.status === 'pending_verification' ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' :
@@ -230,7 +230,7 @@ const Users = () => {
                                                 >
                                                     <Edit className="w-4 h-4" /> Edit
                                                 </button>
-                                                {user.role !== 'customer' && user.id !== 1 && (
+                                                {user.role !== 'customer' && user.role !== 'admin' && (
                                                     <button
                                                         onClick={() => updateStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
                                                         className={`flex items-center gap-1 transition-colors ${
@@ -401,7 +401,7 @@ const Users = () => {
                                         <select
                                             value={role} onChange={(e) => setRole(e.target.value)}
                                             className="block w-full px-3 py-2 bg-[#FAFAFA] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#C8843B]"
-                                            disabled={currentUser.id === 1}
+                                            disabled={currentUser.role === 'admin'}
                                         >
                                             <option value="staff">Staff</option>
                                             <option value="admin">Admin</option>
@@ -412,6 +412,7 @@ const Users = () => {
                                         <select
                                             value={status} onChange={(e) => setStatus(e.target.value)}
                                             className="block w-full px-3 py-2 bg-[#FAFAFA] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#C8843B]"
+                                            disabled={currentUser.role === 'admin'}
                                         >
                                             <option value="active">Active</option>
                                             <option value="inactive">Inactive</option>
