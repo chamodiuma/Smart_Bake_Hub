@@ -1,20 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, Trash2 } from 'lucide-react';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 const Notifications = () => {
-    // For now, we will use an empty state or a few dummy notifications.
-    // In the future, this can be connected to the backend.
-    const [notifications, setNotifications] = useState([
-        { id: 1, title: 'Welcome to Smart Bake Hub Admin', message: 'Your admin account has been set up successfully.', time: '2 hours ago', read: false },
-        { id: 2, title: 'System Update', message: 'The AI Insights module has been updated with new forecasting models.', time: '1 day ago', read: true }
-    ]);
+    const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const markAllAsRead = () => {
-        setNotifications(notifications.map(n => ({ ...n, read: true })));
+    const fetchNotifications = async () => {
+        try {
+            const response = await api.get('/notifications');
+            setNotifications(response.data);
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+            toast.error('Failed to load notifications');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const clearAll = () => {
-        setNotifications([]);
+    useEffect(() => {
+        fetchNotifications();
+    }, []);
+
+    const markAllAsRead = async () => {
+        try {
+            await api.put('/notifications/read-all');
+            setNotifications(notifications.map(n => ({ ...n, is_read: 1 })));
+            toast.success('All notifications marked as read');
+        } catch (error) {
+            toast.error('Failed to mark all as read');
+        }
+    };
+
+    const markAsRead = async (id) => {
+        try {
+            await api.put(`/notifications/${id}/read`);
+            setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+        } catch (error) {
+            console.error('Failed to mark as read:', error);
+        }
+    };
+
+    const formatDate = (dateString) => {
+        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
     };
 
     return (
@@ -25,7 +55,7 @@ const Notifications = () => {
                     <p className="text-sm text-gray-500 mt-1">View and manage your system notifications</p>
                 </div>
                 
-                {notifications.length > 0 && (
+                {notifications.some(n => !n.is_read) && (
                     <div className="flex gap-3">
                         <button 
                             onClick={markAllAsRead}
@@ -33,18 +63,16 @@ const Notifications = () => {
                         >
                             <CheckCircle2 className="w-4 h-4" /> Mark all read
                         </button>
-                        <button 
-                            onClick={clearAll}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors text-red-600"
-                        >
-                            <Trash2 className="w-4 h-4" /> Clear all
-                        </button>
                     </div>
                 )}
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-[#C8843B]/20 overflow-hidden">
-                {notifications.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#C8843B]/20 overflow-hidden min-h-[400px]">
+                {loading ? (
+                    <div className="flex justify-center items-center h-40">
+                        <p className="text-gray-500 font-medium">Loading notifications...</p>
+                    </div>
+                ) : notifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="w-16 h-16 bg-[#F7F4ED] rounded-full flex items-center justify-center mb-4">
                             <Bell className="w-8 h-8 text-gray-400" />
@@ -59,20 +87,21 @@ const Notifications = () => {
                         {notifications.map((notification) => (
                             <div 
                                 key={notification.id} 
-                                className={`p-5 flex gap-4 transition-colors hover:bg-gray-50 ${!notification.read ? 'bg-[#F7F4ED]/50' : 'bg-white'}`}
+                                onClick={() => !notification.is_read && markAsRead(notification.id)}
+                                className={`p-5 flex gap-4 transition-colors ${!notification.is_read ? 'bg-[#F7F4ED]/50 cursor-pointer hover:bg-[#F7F4ED]' : 'bg-white'}`}
                             >
                                 <div className="mt-1 flex-shrink-0">
-                                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 ${!notification.read ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 ${!notification.is_read ? 'bg-red-500' : 'bg-gray-300'}`}></div>
                                 </div>
                                 <div className="flex-1">
-                                    <h4 className={`text-sm mb-1 ${!notification.read ? 'font-bold text-[#2E1A12]' : 'font-medium text-gray-700'}`}>
+                                    <h4 className={`text-sm mb-1 ${!notification.is_read ? 'font-bold text-[#2E1A12]' : 'font-medium text-gray-700'}`}>
                                         {notification.title}
                                     </h4>
                                     <p className="text-sm text-gray-600 leading-relaxed mb-2">
                                         {notification.message}
                                     </p>
                                     <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                                        {notification.time}
+                                        {formatDate(notification.created_at)}
                                     </span>
                                 </div>
                             </div>

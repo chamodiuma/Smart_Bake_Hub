@@ -15,8 +15,12 @@ const ForgotPassword = () => {
         setLoading(true);
         try {
             const { data } = await api.post('/auth/forgot-password', { email });
-            toast.success('Reset link printed to server console! (Demo Mode)', { duration: 6000 });
-            toast.success(data.message, { duration: 6000 });
+            if (data.devOtp) {
+                toast.success('OTP generated (Dev Mode, check console or use: ' + data.devOtp + ')', { duration: 6000 });
+            } else {
+                toast.success(data.message, { duration: 6000 });
+            }
+            navigate('/reset-password', { state: { email } });
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to request password reset');
         } finally {
@@ -69,7 +73,7 @@ const ForgotPassword = () => {
                                 <div className="h-[1px] w-8 bg-[#A67B5B]/30"></div>
                             </div>
                             <p className="text-xs text-gray-500 font-semibold leading-relaxed">
-                                Enter your email address and we'll simulate sending you a password reset link.
+                                Enter your email address and we'll send you a 6-digit OTP to reset your password.
                             </p>
                         </div>
 
@@ -90,7 +94,7 @@ const ForgotPassword = () => {
                                 type="submit" disabled={loading}
                                 className="w-full flex justify-center py-4 px-4 text-xs font-bold rounded-xl text-white bg-[#3D291F] hover:bg-[#2E1A12] focus:outline-none focus:ring-2 focus:ring-[#3D291F] transition-all duration-300 shadow-md hover:shadow-lg cursor-pointer disabled:opacity-50"
                             >
-                                {loading ? 'Sending...' : 'Send Reset Link'}
+                                {loading ? 'Sending...' : 'Send OTP'}
                             </button>
                         </form>
 

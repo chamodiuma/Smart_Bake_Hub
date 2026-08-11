@@ -23,6 +23,7 @@ const aiRoutes = require('./src/routes/aiRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
 const orderRoutes = require('./src/routes/orderRoutes');
 const cateringRoutes = require('./src/routes/cateringRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -33,6 +34,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/catering', cateringRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
     res.send('Smart Bake Hub API is running...');

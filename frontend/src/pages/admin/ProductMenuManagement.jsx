@@ -182,13 +182,16 @@ const ProductMenuManagement = () => {
                                     <div className="flex justify-center items-center py-2 relative group">
                                         <div className="text-center">
                                             {menu.portion_type === 'varied' ? (
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <p className="text-xl font-bold text-[#C8843B]">
-                                                        <span className="text-sm">S:</span> Rs. {Number(menu.price_small || 0).toFixed(2)}
-                                                        <span className="mx-2 text-gray-300">|</span>
-                                                        <span className="text-sm">L:</span> Rs. {Number(menu.price_large || 0).toFixed(2)}
-                                                    </p>
-                                                    <p className="text-[10px] uppercase font-bold text-[#2E1A12]/60 tracking-wider mt-1">Small / Large</p>
+                                                <div className="flex flex-col gap-2 w-full max-w-[180px] mx-auto mt-2">
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-[11px] uppercase font-bold text-[#2E1A12]/60 tracking-wider">Small</span>
+                                                        <span className="text-lg font-bold text-[#C8843B] whitespace-nowrap">Rs. {Number(menu.price_small || 0).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="w-full border-b border-dashed border-[#C8843B]/40"></div>
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-[11px] uppercase font-bold text-[#2E1A12]/60 tracking-wider">Large</span>
+                                                        <span className="text-lg font-bold text-[#C8843B] whitespace-nowrap">Rs. {Number(menu.price_large || 0).toFixed(2)}</span>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <>

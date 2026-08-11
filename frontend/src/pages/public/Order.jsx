@@ -12,6 +12,7 @@ const Order = () => {
     const [items, setItems] = useState([]);
     const [orderType, setOrderType] = useState('takeaway'); // 'dine-in' or 'takeaway'
     const [tableNumber, setTableNumber] = useState('');
+    const [specialNote, setSpecialNote] = useState('');
     const [loading, setLoading] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
@@ -81,15 +82,61 @@ const Order = () => {
                 };
             });
             
-            await api.post('/orders', {
+            // Check if there's a recent order within 5 minutes
+            let appendToOrderId = null;
+            const recentOrderStr = localStorage.getItem('recentOrder');
+            if (recentOrderStr) {
+                try {
+                    const recentOrder = JSON.parse(recentOrderStr);
+                    if (Date.now() - recentOrder.timestamp < 5 * 60 * 1000) {
+                        appendToOrderId = recentOrder.orderId;
+                    } else {
+                        localStorage.removeItem('recentOrder'); // Expired
+                    }
+                } catch (e) {}
+            }
+
+            const response = await api.post('/orders', {
                 items: formattedItems,
                 order_type: orderType,
-                table_number: orderType === 'dine-in' ? tableNumber : null
+                table_number: orderType === 'dine-in' ? tableNumber : null,
+                special_note: specialNote,
+                append_to_order_id: appendToOrderId
             });
+            
+            // Save this order as the recent order
+            localStorage.setItem('recentOrder', JSON.stringify({
+                orderId: response.data?.orderId || response.data?.appendedOrderId,
+                timestamp: Date.now()
+            }));
 
             clearCart();
+            
+            // Calculate Estimated Preparation Time
+            const totalQuantity = formattedItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+            let prepTimeMinutes = 60; // Default 1 hour
+            
+            if (totalQuantity >= 3 && totalQuantity <= 4) {
+                prepTimeMinutes = 90; // 1.5 hours
+            } else if (totalQuantity > 4) {
+                prepTimeMinutes = 120; // 2 hours
+            }
+            
+            const readyTime = new Date(Date.now() + prepTimeMinutes * 60000);
+            const timeString = readyTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const durationString = prepTimeMinutes === 60 ? "1 hour" : (prepTimeMinutes === 90 ? "1.5 hours" : (prepTimeMinutes / 60) + " hours");
+            
             setItems([]);
-            toast.success('Your order has been successfully placed!', { icon: '🎉' });
+            toast.success(`Order Placed! Ready around ${timeString} (in ${durationString})`, { 
+                icon: '🎉',
+                duration: 6000,
+                style: {
+                    borderRadius: '10px',
+                    background: '#2E1A12',
+                    color: '#fff',
+                    maxWidth: '400px'
+                },
+            });
             navigate('/');
         } catch (error) {
             console.error('Checkout error:', error);
@@ -230,6 +277,17 @@ const Order = () => {
                                                 />
                                             </div>
                                         )}
+
+                                        <div className="space-y-3 pt-3 border-t border-gray-100">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Special Instructions / Note (Optional)</label>
+                                            <textarea 
+                                                rows="2"
+                                                placeholder="e.g. Less sugar, no onions..."
+                                                value={specialNote}
+                                                onChange={(e) => setSpecialNote(e.target.value)}
+                                                className="w-full bg-[#FAFAFA] border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-semibold text-[#2E1A12] focus:outline-none focus:border-[#C8843B] transition-all resize-none"
+                                            ></textarea>
+                                        </div>
 
                                         <div className="space-y-3.5 border-t border-b border-gray-100 py-4 mt-4 text-xs font-semibold text-gray-500">
                                             <div className="flex justify-between">

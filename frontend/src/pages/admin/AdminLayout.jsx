@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { 
     LayoutDashboard, Users, ShoppingCart, Package, Box, Calendar, 
     Sparkles, FileText, Bell, Settings, LogOut, ChevronDown, Menu, Utensils, QrCode, Coffee
 } from 'lucide-react';
+import LogoutConfirmation from '../../components/LogoutConfirmation';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 const AdminLayout = () => {
     const { logout, user } = useAuthStore();
@@ -12,9 +15,47 @@ const AdminLayout = () => {
     const location = useLocation();
     const [isAiInsightsOpen, setIsAiInsightsOpen] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [lastNotificationId, setLastNotificationId] = useState(null);
 
-    const handleLogout = () => {
+    const fetchNotifications = async () => {
+        try {
+            const response = await api.get('/notifications');
+            const notifications = response.data;
+            const unread = notifications.filter(n => !n.is_read);
+            setUnreadCount(unread.length);
+
+            // Check if there's a NEW notification to show a toast
+            if (notifications.length > 0) {
+                const latestId = notifications[0].id;
+                if (lastNotificationId !== null && latestId > lastNotificationId) {
+                    // It's a new notification!
+                    toast.success(notifications[0].title, {
+                        icon: '🔔',
+                        style: {
+                            borderRadius: '10px',
+                            background: '#333',
+                            color: '#fff',
+                        },
+                    });
+                }
+                setLastNotificationId(latestId);
+            }
+        } catch (error) {
+            console.error('Failed to fetch notifications:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 15000); // Poll every 15s
+        return () => clearInterval(interval);
+    }, [lastNotificationId]);
+
+    const handleConfirmLogout = () => {
         logout();
+        setShowLogoutModal(false);
         navigate('/admin/login');
     };
 
@@ -143,14 +184,18 @@ const AdminLayout = () => {
                         <div className="flex items-center space-x-2 border-l border-[#C8843B]/20 pl-6">
                             <Link to="/admin/notifications" className="relative p-2 rounded-full text-[#2E1A12] hover:bg-[#FFFDFC] hover:text-[#C8843B] transition-colors" title="Notifications">
                                 <Bell className="w-5 h-5" />
-                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#F7F4ED]"></span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-[#F7F4ED] text-[9px] font-bold text-white flex items-center justify-center">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
                             </Link>
                             
                             <Link to="/admin/settings" className="p-2 rounded-full text-[#2E1A12] hover:bg-[#FFFDFC] hover:text-[#C8843B] transition-colors" title="Settings">
                                 <Settings className="w-5 h-5" />
                             </Link>
 
-                            <button onClick={handleLogout} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition-colors" title="Logout">
+                            <button onClick={() => setShowLogoutModal(true)} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition-colors" title="Logout">
                                 <LogOut className="w-5 h-5" />
                             </button>
                         </div>
@@ -162,6 +207,12 @@ const AdminLayout = () => {
                 </main>
             </div>
             
+            <LogoutConfirmation 
+                isOpen={showLogoutModal}
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutModal(false)}
+            />
+
             <style dangerouslySetInnerHTML={{__html: `
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 6px;
