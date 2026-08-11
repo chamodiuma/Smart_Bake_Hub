@@ -60,8 +60,8 @@ const createBeverage = async (req, res) => {
     try {
         // Insert beverage
         const [result] = await pool.query(
-            'INSERT INTO beverages (beverage_category_id, beverage_code, name, portion_type, price, price_small, price_large, price_variants, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [beverage_category_id || null, beverage_code, name, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, price_variants ? JSON.stringify(price_variants) : null, status]
+            'INSERT INTO beverages (beverage_category_id, beverage_code, name, portion_type, price, price_small, price_large, price_variants, status, discount_percentage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [beverage_category_id || null, beverage_code, name, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, price_variants ? JSON.stringify(price_variants) : null, status, discount_percentage]
         );
 
         const beverageId = result.insertId;
@@ -74,14 +74,14 @@ const createBeverage = async (req, res) => {
 
 // @desc    Update a beverage
 const updateBeverage = async (req, res) => {
-    const { name, beverage_code, beverage_category_id, portion_type, price, price_small, price_large, price_variants, status, productItems = [] } = req.body;
+    const { name, beverage_code, beverage_category_id, portion_type, price, price_small, price_large, price_variants, status, discount_percentage, productItems = [] } = req.body;
     const { id } = req.params;
 
     try {
         // Update beverage
         await pool.query(
-            'UPDATE beverages SET name=?, beverage_code=?, beverage_category_id=?, portion_type=?, price=?, price_small=?, price_large=?, price_variants=?, status=? WHERE id=?',
-            [name, beverage_code, beverage_category_id || null, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, price_variants ? JSON.stringify(price_variants) : null, status || 'active', id]
+            'UPDATE beverages SET name=?, beverage_code=?, beverage_category_id=?, portion_type=?, price=?, price_small=?, price_large=?, price_variants=?, status=?, discount_percentage=? WHERE id=?',
+            [name, beverage_code, beverage_category_id || null, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, price_variants ? JSON.stringify(price_variants) : null, status || 'active', discount_percentage || 0, id]
         );
 
         res.json({ message: 'Beverage updated successfully' });

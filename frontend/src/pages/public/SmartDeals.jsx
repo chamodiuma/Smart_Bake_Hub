@@ -19,8 +19,45 @@ const SmartDeals = () => {
     useEffect(() => {
         const fetchDeals = async () => {
             try {
-                const { data } = await api.get('/products?discounted=true');
-                setDeals(data);
+                // Fetch from all sources
+                const [productsRes, menusRes, beveragesRes] = await Promise.all([
+                    api.get('/products?discounted=true').catch(() => ({ data: [] })),
+                    api.get('/menus?discounted=true').catch(() => ({ data: [] })),
+                    api.get('/beverages?discounted=true').catch(() => ({ data: [] }))
+                ]);
+                
+                const products = productsRes.data || [];
+                const menus = menusRes.data || [];
+                const beverages = beveragesRes.data || [];
+                
+                // Format menus to match deal structure
+                const formattedMenus = menus.map(m => ({
+                    ...m,
+                    item_type: 'menu',
+                    deal_id: `menu-${m.id}`,
+                    price: m.portion_type === 'varied' ? m.price_small : m.price
+                }));
+                
+                // Format beverages to match deal structure
+                const formattedBeverages = beverages.map(b => ({
+                    ...b,
+                    item_type: 'beverage',
+                    deal_id: `beverage-${b.id}`,
+                    price: b.portion_type === 'bottles' && b.price_variants ? (typeof b.price_variants === 'string' ? JSON.parse(b.price_variants)[0]?.price : b.price_variants[0]?.price) : b.price
+                }));
+                
+                // Format products
+                const formattedProducts = products.map(p => ({
+                    ...p,
+                    item_type: 'product',
+                    deal_id: `product-${p.id}`
+                }));
+
+                // Merge and filter
+                const allDeals = [...formattedProducts, ...formattedMenus, ...formattedBeverages];
+                const activeDeals = allDeals.filter(d => Number(d.discount_percentage) > 0);
+                
+                setDeals(activeDeals);
             } catch (error) {
                 console.error("Failed to fetch deals", error);
             } finally {
@@ -36,7 +73,15 @@ const SmartDeals = () => {
             navigate('/login');
             return;
         }
-        const item = { id: `deal-${deal.id}`, productId: deal.id, name: deal.name, price: Number(deal.price) * (1 - deal.discount_percentage / 100), quantity: 1 };
+        const item = { 
+            id: deal.deal_id, 
+            productId: deal.item_type === 'product' ? deal.id : null, 
+            menuId: deal.item_type === 'menu' ? deal.id : null,
+            beverageId: deal.item_type === 'beverage' ? deal.id : null,
+            name: deal.name, 
+            price: Number(deal.price) * (1 - deal.discount_percentage / 100), 
+            quantity: 1 
+        };
         addToCart(item);
         toast.success('Added to cart');
     };
@@ -75,7 +120,7 @@ const SmartDeals = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                             {deals.map((deal, idx) => (
                                 <ScrollReveal 
-                                    key={deal.id} 
+                                    key={deal.deal_id} 
                                     variant="fade-up" 
                                     duration={800} 
                                     delay={idx * 120}

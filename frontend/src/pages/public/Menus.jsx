@@ -59,7 +59,8 @@ const Menus = () => {
                             status: item.status,
                             portion_type: item.portion_type,
                             price_small: item.price_small,
-                            price_large: item.price_large
+                            price_large: item.price_large,
+                            discount_percentage: item.discount_percentage
                         }));
                         allItems = [...allItems, ...mappedMenus];
                     }
@@ -84,7 +85,8 @@ const Menus = () => {
                             portion_type: item.portion_type || 'standard',
                             price_small: item.price_small,
                             price_large: item.price_large,
-                            price_variants: typeof item.price_variants === 'string' ? JSON.parse(item.price_variants) : item.price_variants
+                            price_variants: typeof item.price_variants === 'string' ? JSON.parse(item.price_variants) : item.price_variants,
+                            discount_percentage: item.discount_percentage
                         }));
                         allItems = [...allItems, ...mappedBevs];
                     }
@@ -163,7 +165,9 @@ const Menus = () => {
 
         const itemId = `wijayasiri-${item.code}`;
         const finalName = item.name;
-        const finalPrice = item.price || 0;
+        const discount = Number(item.discount_percentage) || 0;
+        const discountedPrice = discount > 0 ? (item.price * (1 - discount / 100)) : item.price;
+        const finalPrice = discountedPrice || 0;
 
         const orderItem = { 
             id: itemId, 
@@ -192,13 +196,16 @@ const Menus = () => {
             finalPrice = variant.price;
         }
 
+        const discount = Number(item.discount_percentage) || 0;
+        const discountedPrice = discount > 0 ? (finalPrice * (1 - discount / 100)) : finalPrice;
+
         const itemId = `wijayasiri-${item.code}-${sizeId}`;
         const finalName = `${item.name} (${sizeName})`;
 
         const payloadItem = {
             id: itemId,
             name: finalName,
-            price: finalPrice || 0,
+            price: discountedPrice || 0,
             quantity: 1
         };
 
@@ -355,6 +362,11 @@ const Menus = () => {
                                             <div className="p-6 space-y-4">
                                                 <div className="flex justify-between items-start gap-4">
                                                     <div className="flex items-center gap-2 flex-wrap">
+                                                        {Number(item.discount_percentage) > 0 && (
+                                                            <span className="text-[10px] font-black text-white bg-red-500 px-2.5 py-1 rounded-xl border border-red-600 shadow-sm animate-pulse">
+                                                                {Number(item.discount_percentage)}% OFF
+                                                            </span>
+                                                        )}
                                                         <span className="text-[10px] font-black text-[#C8843B] bg-[#FDF6ED] px-2.5 py-1 rounded-xl border border-[#C8843B]/10 shadow-sm">
                                                             Code: {item.code}
                                                         </span>
@@ -388,12 +400,24 @@ const Menus = () => {
                                                         <div className="text-[9px] text-gray-400 font-black uppercase tracking-wider">{item.portion_type === 'varied' ? 'Small / Large' : 'Price'}</div>
                                                         <div className="text-xl font-black text-[#C8843B] transition-all duration-300">
                                                             {item.portion_type === 'varied' ? (
-                                                                <div className="flex gap-2">
-                                                                    <span className="text-gray-700">
-                                                                        <span className="text-xs text-gray-400 font-bold mr-1">S:</span> Rs. {(item.price_small || 0).toLocaleString()}
+                                                                <div className="flex flex-col gap-1">
+                                                                    <span className="text-gray-700 text-sm">
+                                                                        <span className="text-[10px] text-gray-400 font-bold mr-1">S:</span> 
+                                                                        {Number(item.discount_percentage) > 0 ? (
+                                                                            <>
+                                                                                <span className="line-through text-gray-400 text-xs mr-2">Rs. {(item.price_small || 0).toLocaleString()}</span>
+                                                                                <span className="text-[#C8843B]">Rs. {((item.price_small || 0) * (1 - item.discount_percentage/100)).toLocaleString()}</span>
+                                                                            </>
+                                                                        ) : `Rs. ${(item.price_small || 0).toLocaleString()}`}
                                                                     </span>
-                                                                    <span className="text-gray-700">
-                                                                        <span className="text-xs text-gray-400 font-bold mr-1">L:</span> Rs. {(item.price_large || 0).toLocaleString()}
+                                                                    <span className="text-gray-700 text-sm">
+                                                                        <span className="text-[10px] text-gray-400 font-bold mr-1">L:</span> 
+                                                                        {Number(item.discount_percentage) > 0 ? (
+                                                                            <>
+                                                                                <span className="line-through text-gray-400 text-xs mr-2">Rs. {(item.price_large || 0).toLocaleString()}</span>
+                                                                                <span className="text-[#C8843B]">Rs. {((item.price_large || 0) * (1 - item.discount_percentage/100)).toLocaleString()}</span>
+                                                                            </>
+                                                                        ) : `Rs. ${(item.price_large || 0).toLocaleString()}`}
                                                                     </span>
                                                                 </div>
                                                             ) : item.portion_type === 'bottles' && item.price_variants && item.price_variants.length > 0 ? (
@@ -401,12 +425,22 @@ const Menus = () => {
                                                                     {item.price_variants.map((v, i) => (
                                                                         <span key={i} className="text-gray-700 whitespace-nowrap">
                                                                             <span className="text-gray-400 font-bold mr-1">{v.size}:</span> 
-                                                                            Rs. {(Number(v.price) || 0).toLocaleString()}
+                                                                            {Number(item.discount_percentage) > 0 ? (
+                                                                                <>
+                                                                                    <span className="line-through text-gray-400 mr-1">Rs. {(Number(v.price) || 0).toLocaleString()}</span>
+                                                                                    <span className="text-[#C8843B]">Rs. {((Number(v.price) || 0) * (1 - item.discount_percentage/100)).toLocaleString()}</span>
+                                                                                </>
+                                                                            ) : `Rs. ${(Number(v.price) || 0).toLocaleString()}`}
                                                                         </span>
                                                                     ))}
                                                                 </div>
                                                             ) : (
-                                                                `Rs. ${(finalPrice || 0).toLocaleString()}`
+                                                                Number(item.discount_percentage) > 0 ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="line-through text-gray-400 text-sm">Rs. {(item.price || 0).toLocaleString()}</span>
+                                                                        <span>Rs. {((item.price || 0) * (1 - item.discount_percentage/100)).toLocaleString()}</span>
+                                                                    </div>
+                                                                ) : `Rs. ${(item.price || 0).toLocaleString()}`
                                                             )}
                                                         </div>
                                                     </div>

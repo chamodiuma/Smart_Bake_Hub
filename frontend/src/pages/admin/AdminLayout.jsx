@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { 
     LayoutDashboard, Users, ShoppingCart, Package, Box, Calendar, 
-    Sparkles, FileText, Bell, Settings, LogOut, ChevronDown, Menu, Utensils, QrCode, Coffee
+    Sparkles, FileText, Bell, Settings, LogOut, ChevronDown, Menu, Utensils, QrCode, Coffee, MessageSquare
 } from 'lucide-react';
 import LogoutConfirmation from '../../components/LogoutConfirmation';
 import api from '../../services/api';
@@ -70,6 +70,7 @@ const AdminLayout = () => {
         { name: 'Users', href: '/admin/users', icon: Users, adminOnly: true },
         { name: 'Events & Booking', href: '/admin/events', icon: Calendar },
         { name: 'Reports', href: '/admin/reports', icon: FileText },
+        { name: 'Chat Support', href: '/admin/chat', icon: MessageSquare },
     ];
 
     return (

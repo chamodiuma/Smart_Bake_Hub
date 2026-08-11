@@ -3,7 +3,7 @@ const pool = require('../config/db');
 // @desc    Get all menus
 const getMenus = async (req, res) => {
     try {
-        const { keyword, category } = req.query;
+        const { keyword, category, discounted } = req.query;
         let query = `SELECT m.*, c.name as category_name
                      FROM dishes m 
                      LEFT JOIN dish_categories c ON m.category_id = c.id
@@ -18,6 +18,10 @@ const getMenus = async (req, res) => {
         if (category) {
             query += ' AND c.name = ?';
             queryParams.push(category);
+        }
+
+        if (discounted === 'true') {
+            query += ' AND m.discount_percentage > 0';
         }
 
         query += ' GROUP BY m.id ORDER BY m.created_at DESC';
@@ -74,14 +78,14 @@ const createMenu = async (req, res) => {
 
 // @desc    Update a menu
 const updateMenu = async (req, res) => {
-    const { name, dish_code, menu_category, category_id, portion_type, price, price_small, price_large, status, productItems = [] } = req.body;
+    const { name, dish_code, menu_category, category_id, portion_type, price, price_small, price_large, status, discount_percentage, productItems = [] } = req.body;
     const { id } = req.params;
 
     try {
         // Update menu
         await pool.query(
-            'UPDATE dishes SET name=?, dish_code=?, menu_category=?, category_id=?, portion_type=?, price=?, price_small=?, price_large=?, status=? WHERE id=?',
-            [name, dish_code, menu_category || null, category_id || null, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, status || 'active', id]
+            'UPDATE dishes SET name=?, dish_code=?, menu_category=?, category_id=?, portion_type=?, price=?, price_small=?, price_large=?, status=?, discount_percentage=? WHERE id=?',
+            [name, dish_code, menu_category || null, category_id || null, portion_type || 'regular', price || 0, price_small || 0, price_large || 0, status || 'active', discount_percentage || 0, id]
         );
 
         res.json({ message: 'Menu updated successfully' });

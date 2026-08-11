@@ -37,8 +37,10 @@ const registerUser = async (req, res) => {
             if (userExists[0].status === 'pending_verification') {
                 const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
                 await pool.query('UPDATE users SET verification_token = ? WHERE id = ?', [verificationToken, userExists[0].id]);
-                const emailSent = await sendOtpEmail(email, verificationToken);
-                if (!emailSent) {
+                const isEmailConfigured = !!process.env.EMAIL_USER && !!process.env.EMAIL_PASS;
+                if (isEmailConfigured) {
+                    sendOtpEmail(email, verificationToken).catch(err => console.error("Async Email Error:", err));
+                } else {
                     console.log(`\n=========================================\n[FALLBACK] YOUR OTP CODE FOR ${email} IS: [ ${verificationToken} ]\n=========================================\n`);
                 }
                 return res.status(200).json({
@@ -48,7 +50,7 @@ const registerUser = async (req, res) => {
                     email,
                     role: userExists[0].role,
                     status: 'pending_verification',
-                    devOtp: !emailSent ? verificationToken : null
+                    devOtp: !isEmailConfigured ? verificationToken : null
                 });
             }
             return res.status(400).json({ message: 'User already exists' });
@@ -68,8 +70,10 @@ const registerUser = async (req, res) => {
         );
         
         // Send actual OTP email, fallback to console if it fails
-        const emailSent = await sendOtpEmail(email, verificationToken);
-        if (!emailSent) {
+        const isEmailConfigured = !!process.env.EMAIL_USER && !!process.env.EMAIL_PASS;
+        if (isEmailConfigured) {
+            sendOtpEmail(email, verificationToken).catch(err => console.error("Async Email Error:", err));
+        } else {
             console.log(`\n=========================================\n[FALLBACK] YOUR OTP CODE FOR ${email} IS: [ ${verificationToken} ]\n=========================================\n`);
         }
 
@@ -80,7 +84,7 @@ const registerUser = async (req, res) => {
             email,
             role,
             status,
-            devOtp: !emailSent ? verificationToken : null
+            devOtp: !isEmailConfigured ? verificationToken : null
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -218,14 +222,16 @@ const resendOtp = async (req, res) => {
             [newOtp, user.id]
         );
 
-        const emailSent = await sendOtpEmail(email, newOtp);
-        if (!emailSent) {
+        const isEmailConfigured = !!process.env.EMAIL_USER && !!process.env.EMAIL_PASS;
+        if (isEmailConfigured) {
+            sendOtpEmail(email, newOtp).catch(err => console.error("Async Email Error:", err));
+        } else {
             console.log(`\n=========================================\n[FALLBACK - RESEND] YOUR OTP CODE FOR ${email} IS: [ ${newOtp} ]\n=========================================\n`);
         }
 
         res.status(200).json({ 
             message: 'A new OTP has been sent to your email.',
-            devOtp: !emailSent ? newOtp : null
+            devOtp: !isEmailConfigured ? newOtp : null
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

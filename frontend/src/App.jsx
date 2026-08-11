@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'react-hot-toast';
+import ErrorBoundary from './components/ErrorBoundary';
 import api from './services/api';
 // Public Pages
 import Home from './pages/public/Home';
@@ -16,6 +17,7 @@ import AboutUs from './pages/public/AboutUs';
 import EventBooking from './pages/public/EventBooking';
 import Contact from './pages/public/Contact';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import Chatbot from './components/Chatbot';
 import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin Pages
@@ -39,6 +41,7 @@ import AddEvent from './pages/admin/AddEvent';
 import Settings from './pages/admin/Settings';
 import Notifications from './pages/admin/Notifications';
 import QRCodes from './pages/admin/QRCodes';
+import ChatSupport from './pages/admin/ChatSupport';
 import StaffDashboard from './pages/staff/StaffDashboard';
 import StaffLogin from './pages/auth/StaffLogin';
 import AdminSetup from './pages/auth/AdminSetup';
@@ -93,6 +96,7 @@ function App() {
         <Router>
             <GlobalSetupCheck />
             <Toaster position="top-right" />
+            <ErrorBoundary>
             <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
@@ -136,6 +140,7 @@ function App() {
                     <Route path="settings" element={<Settings />} />
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="qrcodes" element={<QRCodes />} />
+                    <Route path="chat" element={<ChatSupport />} />
                 </Route>
 
                 {/* Staff Routes */}
@@ -145,6 +150,8 @@ function App() {
                     </PrivateRoute>
                 } />
             </Routes>
+            </ErrorBoundary>
+            <Chatbot />
         </Router>
     );
 }
