@@ -5,26 +5,73 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import ScrollReveal from '../../components/ScrollReveal';
 import { 
-    ResponsiveContainer, AreaChart, Area, BarChart, Bar, 
-    XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell, PieChart, Pie
+    ResponsiveContainer, BarChart, Bar, 
+    XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell
 } from 'recharts';
 import { 
     LayoutDashboard, ShoppingBag, ListTodo, Box, AlertTriangle, 
     Calendar, MessageSquare, Bell, User, LogOut, ChevronLeft, 
-    ChevronRight, Search, Clock, ShieldCheck, Sparkles, Check, 
-    Play, CheckCircle2, QrCode, Power, Printer, FileText, 
-    AlertCircle, Send, Plus, Minus, Filter, Eye, Activity, RotateCcw
+    ChevronRight, Search, Clock, Check, Play, CheckCircle2, 
+    ArrowUpRight, Users, Store, Settings, HelpCircle, FileText, ChevronDown
 } from 'lucide-react';
 import LogoutConfirmation from '../../components/LogoutConfirmation';
+
+// Import Admin Components for rendering inside the Staff Layout
+import Orders from '../admin/Orders';
+import ChatSupport from '../admin/ChatSupport';
+import Events from '../admin/Events';
+import ProductMenuManagement from '../admin/ProductMenuManagement';
+import SettingsPage from '../admin/Settings';
+import TablesManagement from '../admin/TablesManagement';
 
 const StaffDashboard = () => {
     const { user, logout } = useAuthStore();
     const navigate = useNavigate();
     
     // UI state
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [time, setTime] = useState(new Date());
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [recentOrders, setRecentOrders] = useState([]);
+    
+    // Store Selection State
+    const [selectedBranch, setSelectedBranch] = useState('Main Branch');
+    const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
+
+    // Keep clock ticking
+    useEffect(() => {
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'dashboard') {
+            fetchRecentOrders();
+        }
+    }, [activeTab]);
+
+    const fetchRecentOrders = async () => {
+        try {
+            const { data } = await api.get('/orders');
+            // Filter pending orders and take top 3
+            const pending = data.filter(o => o.status === 'pending').slice(0, 3);
+            setRecentOrders(pending);
+        } catch (error) {
+            console.error('Failed to fetch recent orders:', error);
+        }
+    };
+
+    const handleOrderStatus = async (orderId, status) => {
+        try {
+            await api.patch(`/orders/${orderId}/status`, { status });
+            toast.success(`Order ${status === 'accepted' ? 'accepted' : 'declined'} successfully!`);
+            fetchRecentOrders();
+        } catch (error) {
+            toast.error('Failed to update order status');
+        }
+    };
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isInventoryDrawerOpen, setIsInventoryDrawerOpen] = useState(false);
     const [selectedInventoryProduct, setSelectedInventoryProduct] = useState(null);
@@ -37,112 +84,111 @@ const StaffDashboard = () => {
         navigate('/');
     };
 
-    // Dynamic Clock Heuristic
+    // 1. Live Order Kanban Board State
+    const [orders, setOrders] = useState([]);
+    
+    // Event Bookings State
+    const [bookings, setBookings] = useState([]);
+
+    // Fetch data from backend
     useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
+        const fetchDashboardData = async () => {
+            try {
+                // Fetch Orders
+                const ordersRes = await api.get('/orders');
+                const formattedOrders = ordersRes.data.map(o => ({
+                    id: o._id,
+                    displayId: o._id.substring(o._id.length - 4),
+                    customer: o.customerInfo?.name || o.user?.name || 'Customer',
+                    type: o.orderType || 'Takeaway',
+                    items: o.orderItems.map(i => `${i.quantity}x ${i.name}`).join(', '),
+                    priority: o.priority || 'Normal',
+                    elapsed: Math.floor((new Date() - new Date(o.createdAt)) / 60000),
+                    est: '15 min',
+                    status: o.orderStatus,
+                    total: o.total_amount || 0
+                }));
+                setOrders(formattedOrders);
+
+                // Fetch Inventory (Products)
+                const inventoryRes = await api.get('/products');
+                const formattedInventory = inventoryRes.data.map(p => {
+                    let status = 'good';
+                    let type = 'In Stock';
+                    if (p.countInStock <= 5) {
+                        status = 'warning';
+                        type = 'Low Stock';
+                    }
+                    if (p.countInStock === 0) {
+                        status = 'critical';
+                        type = 'Out of Stock';
+                    }
+                    return {
+                        id: p._id,
+                        name: p.name,
+                        count: p.countInStock,
+                        unit: 'pcs',
+                        type: type,
+                        status: status,
+                        trend: 'stable'
+                    };
+                }).filter(i => i.status !== 'good'); // Only show low/out of stock
+                setInventory(formattedInventory);
+
+                // Fetch Bookings
+                const bookingsRes = await api.get('/bookings/admin');
+                const formattedBookings = bookingsRes.data.map(b => ({
+                    title: `${b.eventType} at ${b.hallName}`,
+                    time: new Date(b.date).toLocaleDateString(),
+                    status: b.status,
+                    notes: `By ${b.name}, Guests: ${b.numberOfGuests}`
+                }));
+                setBookings(formattedBookings);
+
+                // Fetch Chats
+                const chatsRes = await api.get('/chat/admin/sessions');
+                const formattedChats = chatsRes.data.map(c => ({
+                    id: c.session_id,
+                    name: c.user_id ? `User ${c.user_id.substring(c.user_id.length - 4)}` : 'Customer',
+                    msg: c.messages[c.messages.length - 1]?.text || 'No messages',
+                    unread: c.status === 'open' ? 1 : 0,
+                    messages: c.messages
+                }));
+                setChats(formattedChats);
+
+            } catch (error) {
+                console.error("Failed to fetch dashboard data:", error);
+            }
+        };
+
+        fetchDashboardData();
+        const interval = setInterval(fetchDashboardData, 30000); 
+        return () => clearInterval(interval);
     }, []);
 
-    // 1. Live Order Kanban Board State (Mock starting data, dynamic client manipulation)
-    const [orders, setOrders] = useState([
-        { id: '1082', customer: 'Liam Neeson', type: 'Dine-In (Table 4)', items: '2x Butter Croissants, 1x Hazelnut Latte', priority: 'High', elapsed: 8, est: '12 min', status: 'Pending' },
-        { id: '1083', customer: 'Emma Watson', type: 'Takeaway', items: '1x Chocolate Ganache Cake (M)', priority: 'Medium', elapsed: 14, est: '20 min', status: 'Accepted' },
-        { id: '1084', customer: 'Keanu Reeves', type: 'Delivery', items: '1x Creamy Pesto Pasta, 1x Iced Latte', priority: 'High', elapsed: 3, est: '15 min', status: 'Preparing' },
-        { id: '1085', customer: 'Scarlett J.', type: 'Dine-In (Table 9)', items: '4x Strawberry Velvet Cupcakes', priority: 'Normal', elapsed: 18, est: '10 min', status: 'Ready' },
-        { id: '1086', customer: 'Robert Downey', type: 'Takeaway', items: '2x Garlic Bread, 1x Vegetable Soup', priority: 'Normal', elapsed: 25, est: '25 min', status: 'Completed' }
-    ]);
-
-    // Kanban status helpers
-    const moveOrder = (orderId, newStatus) => {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, elapsed: 0 } : o));
-        toast.success(`Order #${orderId} moved to ${newStatus}`);
+    const moveOrder = async (orderId, displayId, newStatus) => {
+        try {
+            await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, elapsed: 0 } : o));
+            toast.success(`Order #${displayId} moved to ${newStatus}`);
+        } catch (error) {
+            toast.error("Failed to update order status");
+        }
     };
 
-    // 2. Kitchen Queue Timeline (Ordered by Priority/Urgency)
     const kitchenQueue = useMemo(() => {
         const sorted = [...orders].filter(o => o.status === 'Accepted' || o.status === 'Preparing');
         const priorityWeight = { 'High': 3, 'Medium': 2, 'Normal': 1 };
-        return sorted.sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
+        return sorted.sort((a, b) => (priorityWeight[b.priority] || 1) - (priorityWeight[a.priority] || 1));
     }, [orders]);
 
-    // 3. Inventory Snapshots State
-    const [inventory, setInventory] = useState([
-        { id: 101, name: 'Premium Butter', count: 12, unit: 'kg', type: 'Low Stock', status: 'critical', trend: 'down' },
-        { id: 102, name: 'Whipped Cream', count: 4, unit: 'liters', type: 'Low Stock', status: 'critical', trend: 'down' },
-        { id: 103, name: 'Strawberries (Fresh)', count: 2, unit: 'kg', type: 'Near Expiry', status: 'warning', trend: 'stable' },
-        { id: 104, name: 'Wheat Flour', count: 85, unit: 'kg', type: 'Recently Updated', status: 'good', trend: 'up' },
-        { id: 105, name: 'Chocolate Ganache Premix', count: 0, unit: 'packs', type: 'Out of Stock', status: 'out', trend: 'down' }
-    ]);
-
-    // Open inventory edit drawer
-    const openInventoryDrawer = (prod) => {
-        setSelectedInventoryProduct(prod ? { ...prod } : { id: Date.now(), name: '', count: 0, unit: 'pcs', type: 'Recently Updated', status: 'good', trend: 'stable' });
-        setIsInventoryDrawerOpen(true);
-    };
-
-    const handleSaveInventory = (e) => {
-        e.preventDefault();
-        setInventory(prev => {
-            const exists = prev.some(p => p.id === selectedInventoryProduct.id);
-            if (exists) {
-                return prev.map(p => p.id === selectedInventoryProduct.id ? selectedInventoryProduct : p);
-            }
-            return [...prev, selectedInventoryProduct];
-        });
-        setIsInventoryDrawerOpen(false);
-        toast.success('Inventory snapshot updated!');
-    };
-
-    // 4. Live Chat Pane State
-    const [chats, setChats] = useState([
-        { id: 1, name: 'John Wick', msg: 'Is the Sugar-Free Chocolate Cake available today?', unread: 2, messages: [{ sender: 'customer', text: 'Is the Sugar-Free Chocolate Cake available today?' }] },
-        { id: 2, name: 'Thor Odinson', msg: 'Can I add extra honey to my tea order?', unread: 1, messages: [{ sender: 'customer', text: 'Can I add extra honey to my tea order?' }] },
-        { id: 3, name: 'Bruce Banner', msg: 'My table is ready, thank you.', unread: 0, messages: [{ sender: 'customer', text: 'My table is ready, thank you.' }] }
-    ]);
-
-    const handleSendChatReply = (e) => {
-        e.preventDefault();
-        if (!chatReplyText.trim()) return;
-        setChats(prev => prev.map(c => c.id === selectedChatUser.id ? {
-            ...c,
-            unread: 0,
-            msg: chatReplyText,
-            messages: [...c.messages, { sender: 'staff', text: chatReplyText }]
-        } : c));
-        setChatReplyText('');
-        toast.success('Message sent to client!');
-    };
-
-    const applyQuickTemplate = (text) => {
-        setChatReplyText(text);
-    };
-
-    // 5. Notification Panel Alerts
+    const [inventory, setInventory] = useState([]);
+    const [chats, setChats] = useState([]);
     const [notifications, setNotifications] = useState([
         { id: 1, title: 'New Order Received', desc: 'Order #1087 created by John Doe (Table 3)', time: 'Just now', type: 'info' },
-        { id: 2, title: 'Inventory Stock Alert', desc: 'Chocolate Ganache Premix is Out of Stock', time: '12m ago', type: 'error' },
-        { id: 3, title: 'Event Booking Confirmed', desc: 'Wedding Cake delivery slot set for July 12', time: '1h ago', type: 'success' }
+        { id: 2, title: 'Inventory Stock Alert', desc: 'Chocolate Ganache Premix is Out of Stock', time: '12m ago', type: 'error' }
     ]);
 
-    // 6. Analytics Visual Data
-    const hourlyOrdersData = [
-        { hour: '07:00 AM', orders: 12 },
-        { hour: '09:00 AM', orders: 28 },
-        { hour: '11:00 AM', orders: 19 },
-        { hour: '01:00 PM', orders: 32 },
-        { hour: '03:00 PM', orders: 15 },
-        { hour: '05:00 PM', orders: 24 },
-        { hour: '07:00 PM', orders: 30 }
-    ];
-
-    const popularItemsData = [
-        { name: 'Croissants', value: 45, color: '#C8843B' },
-        { name: 'Ganache Cake', value: 30, color: '#8B5E3C' },
-        { name: 'Sandwich', value: 20, color: '#F59E0B' },
-        { name: 'Latte', value: 15, color: '#10B981' }
-    ];
-
-    // Computed KPIs
     const kpiSummary = useMemo(() => {
         return {
             pending: orders.filter(o => o.status === 'Pending').length,
@@ -152,817 +198,472 @@ const StaffDashboard = () => {
         };
     }, [orders]);
 
+    // Data for Revenue Chart (Mocked for staff dashboard as per image)
+    const revenueData = [
+        { name: 'Jan', value: 200 },
+        { name: 'Feb', value: 300 },
+        { name: 'Mar', value: 400 },
+        { name: 'Apr', value: 350 },
+        { name: 'May', value: 598 },
+        { name: 'Jun', value: 450 },
+        { name: 'Jul', value: 500 },
+        { name: 'Aug', value: 600 },
+        { name: 'Sep', value: 700 }
+    ];
+
+    const topDishes = [
+        { name: 'Butter Croissants', value: 963, img: 'https://images.unsplash.com/photo-1555507036-ab1e4006aaeb?w=100&h=100&fit=crop' },
+        { name: 'Chocolate Ganache Cake', value: 837, img: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100&h=100&fit=crop' },
+        { name: 'Strawberry Velvet Cupcake', value: 804, img: 'https://images.unsplash.com/photo-1587668178277-295251f900ce?w=100&h=100&fit=crop' },
+        { name: 'Hazelnut Latte', value: 760, img: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=100&h=100&fit=crop' },
+        { name: 'Garlic Bread', value: 645, img: 'https://images.unsplash.com/photo-1573140247632-f8fd74997d5c?w=100&h=100&fit=crop' },
+        { name: 'Creamy Pesto Pasta', value: 621, img: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=100&h=100&fit=crop' }
+    ];
+
     return (
-        <div className="flex h-screen bg-[#FFF8F0] text-[#1F2937] font-sans overflow-hidden">
+        <div className="flex h-screen bg-[#F3F4F6] text-gray-800 font-sans overflow-hidden">
             
-            {/* LEFT SIDEBAR (Linear Collapsed style) */}
-            <div className={`shrink-0 h-full bg-[#FAF5EE] border-r border-[#C8843B]/10 flex flex-col justify-between transition-all duration-300 relative z-30 ${
+            {/* LEFT SIDEBAR */}
+            <div className={`shrink-0 h-full bg-white border-r border-gray-100 flex flex-col transition-all duration-300 relative z-30 shadow-sm ${
                 isSidebarCollapsed ? 'w-20' : 'w-64'
             }`}>
-                <div>
-                    {/* Header Brand */}
-                    <div className="h-16 flex items-center justify-between px-5 border-b border-[#C8843B]/5">
-                        {!isSidebarCollapsed && (
-                            <div className="flex items-center gap-2">
-                                <img src="/images/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-full bg-white border border-[#C8843B]/10" />
-                                <span className="font-serif font-black text-sm text-[#2E1A12] tracking-wide">Smart Bake Staff</span>
+                {/* Brand */}
+                <div className="h-20 flex items-center px-6 gap-3 mb-4 mt-2">
+                    <div className="w-12 h-12 rounded-full bg-white shadow-sm border border-[#C8843B]/30 flex items-center justify-center shrink-0 p-1">
+                        <img src="/images/logo.png" alt="Logo" className="w-full h-full object-contain rounded-full" />
+                    </div>
+                    {!isSidebarCollapsed && (
+                        <div className="flex flex-col">
+                            <span className="text-xl font-bold text-[#2E1A12] leading-tight font-serif">Smart Bake Hub</span>
+                            <span className="text-[11px] text-[#C8843B] font-medium tracking-wide leading-tight mt-0.5">
+                                Smarter Bakery. Better <br/>Business.
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Nav Items */}
+                <div className="flex-1 px-4 py-6 space-y-8 overflow-y-auto custom-scrollbar">
+                    
+                    {/* Store Selector */}
+                    {!isSidebarCollapsed && (
+                        <div className="space-y-2 relative">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-2">Store</span>
+                            <div 
+                                onClick={() => setIsBranchMenuOpen(!isBranchMenuOpen)}
+                                className="flex items-center justify-between bg-[#F8F9FA] p-3 rounded-2xl cursor-pointer hover:bg-gray-100 transition-colors"
+                            >
+                                <span className="text-sm font-bold text-[#1a202c]">{selectedBranch}</span>
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
                             </div>
-                        )}
-                        {isSidebarCollapsed && (
-                            <img src="/images/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-full bg-white mx-auto border border-[#C8843B]/10" />
-                        )}
+                            
+                            {/* Dropdown Menu */}
+                            {isBranchMenuOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden z-50">
+                                    {['Main Branch', 'City Branch'].map((branch) => (
+                                        <button
+                                            key={branch}
+                                            onClick={() => {
+                                                setSelectedBranch(branch);
+                                                setIsBranchMenuOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
+                                                selectedBranch === branch 
+                                                ? 'bg-[#C8843B]/10 text-[#C8843B]' 
+                                                : 'text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {branch}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        {!isSidebarCollapsed && <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider ml-2">Menu</span>}
+                        <div className="flex flex-col gap-1.5">
+                            <button 
+                                onClick={() => setActiveTab('dashboard')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-semibold ${activeTab === 'dashboard' ? 'bg-gradient-to-r from-[#2E1A12] to-[#C8843B] text-white shadow-md shadow-[#C8843B]/20' : 'text-gray-500 hover:bg-[#C8843B]/10 hover:text-[#C8843B]'}`}>
+                                <LayoutDashboard className="w-5 h-5" />
+                                {!isSidebarCollapsed && <span className="font-semibold text-sm">Dashboard</span>}
+                            </button>
+                            {[
+                                { icon: ShoppingBag, label: 'Orders', id: 'orders' },
+                                { icon: ListTodo, label: 'Kitchen', id: 'kitchen' },
+                                { icon: Box, label: 'Inventory', id: 'inventory' },
+                                { icon: LayoutDashboard, label: 'Tables', id: 'tables' },
+                                { icon: Calendar, label: 'Bookings', id: 'events' },
+                                { icon: MessageSquare, label: 'Chats', id: 'chat' }
+                            ].map((item, idx) => (
+                                <button 
+                                    key={idx} 
+                                    onClick={() => setActiveTab(item.id)}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-semibold ${activeTab === item.id ? 'bg-gradient-to-r from-[#2E1A12] to-[#C8843B] text-white shadow-md shadow-[#C8843B]/20' : 'text-gray-500 hover:bg-[#C8843B]/10 hover:text-[#C8843B]'}`}>
+                                    <item.icon className="w-5 h-5" />
+                                    {!isSidebarCollapsed && <span className="font-medium text-sm">{item.label}</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        {!isSidebarCollapsed && <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider ml-2">Others</span>}
+                        <div className="flex flex-col gap-1.5">
+                            <button 
+                                onClick={() => setActiveTab('help')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-semibold ${activeTab === 'help' ? 'bg-gradient-to-r from-[#2E1A12] to-[#C8843B] text-white shadow-md shadow-[#C8843B]/20' : 'text-gray-500 hover:bg-[#C8843B]/10 hover:text-[#C8843B]'}`}>
+                                <HelpCircle className="w-5 h-5" />
+                                {!isSidebarCollapsed && <span className="font-medium text-sm">Help</span>}
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('settings')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-semibold ${activeTab === 'settings' ? 'bg-gradient-to-r from-[#2E1A12] to-[#C8843B] text-white shadow-md shadow-[#C8843B]/20' : 'text-gray-500 hover:bg-[#C8843B]/10 hover:text-[#C8843B]'}`}>
+                                <Settings className="w-5 h-5" />
+                                {!isSidebarCollapsed && <span className="font-medium text-sm">Settings</span>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Profile Box */}
+                {!isSidebarCollapsed && (
+                    <div className="p-4 border-t border-gray-100">
                         <button 
-                            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                            className="p-1.5 rounded-lg hover:bg-[#C8843B]/10 text-gray-400 hover:text-[#2E1A12] cursor-pointer"
+                            className="flex items-center gap-3 hover:bg-[#C8843B]/10 p-2 rounded-xl transition-colors border border-gray-100 w-full"
+                            onClick={() => setShowLogoutModal(true)}
                         >
-                            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                            <div className="w-9 h-9 rounded-xl bg-[#C8843B]/20 flex items-center justify-center">
+                                <User className="w-5 h-5 text-[#C8843B]" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-bold text-gray-900 truncate">{user?.name || 'Staff User'}</div>
+                                <div className="text-xs text-green-500 font-semibold flex items-center gap-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                    Online
+                                </div>
+                            </div>
+                            <LogOut className="w-4 h-4 text-gray-400" />
                         </button>
                     </div>
-
-                    {/* Navigation Menu */}
-                    <nav className="p-3 space-y-1">
-                        {[
-                            { name: 'Dashboard', icon: LayoutDashboard, active: true },
-                            { name: 'Live Orders', icon: ShoppingBag, count: kpiSummary.pending },
-                            { name: 'Kitchen Queue', icon: ListTodo, count: kitchenQueue.length },
-                            { name: 'Inventory', icon: Box, alert: inventory.filter(i => i.status === 'critical').length },
-                            { name: 'Notifications', icon: Bell, count: notifications.length }
-                        ].map((menuItem) => (
-                            <button
-                                key={menuItem.name}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-xs font-black cursor-pointer ${
-                                    menuItem.active 
-                                        ? 'bg-[#2E1A12] text-white shadow-sm' 
-                                        : 'text-gray-500 hover:bg-[#C8843B]/5 hover:text-[#2E1A12]'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <menuItem.icon className="w-4 h-4 shrink-0" />
-                                    {!isSidebarCollapsed && <span>{menuItem.name}</span>}
-                                </div>
-                                {!isSidebarCollapsed && menuItem.count > 0 && (
-                                    <span className="bg-[#C8843B]/20 text-[#2E1A12] px-2 py-0.5 rounded-lg text-[10px] font-black">
-                                        {menuItem.count}
-                                    </span>
-                                )}
-                                {!isSidebarCollapsed && menuItem.alert > 0 && (
-                                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-lg text-[10px] font-black">
-                                        {menuItem.alert} Alert
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-
-                {/* Profile Widget at Bottom */}
-                <div className="p-4 border-t border-[#C8843B]/5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#C8843B]/20 flex items-center justify-center font-bold text-xs text-[#2E1A12] border border-[#C8843B]/30 relative">
-                            {user?.name?.charAt(0) || 'S'}
-                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full"></span>
-                        </div>
-                        {!isSidebarCollapsed && (
-                            <div className="flex-1 overflow-hidden">
-                                <div className="font-extrabold text-[11px] truncate text-[#2E1A12]">{user?.name || 'Sarah Connor'}</div>
-                                <div className="text-[9px] text-[#C8843B] font-black uppercase tracking-wider">Kitchen Staff</div>
-                            </div>
-                        )}
-                        {!isSidebarCollapsed && (
-                            <button 
-                                onClick={() => setShowLogoutModal(true)}
-                                className="p-1 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg cursor-pointer transition-colors"
-                                title="Logout"
-                            >
-                                <LogOut className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-                </div>
+                )}
             </div>
 
-            {/* MAIN DASHBOARD PANEL */}
-            <div className="flex-1 h-full flex flex-col overflow-hidden relative">
-                
-                {/* TOP NAVIGATION */}
-                <header className="sticky top-0 bg-[#FFF8F0]/90 backdrop-blur-md z-20 h-16 flex items-center justify-between px-6 border-b border-[#C8843B]/5 shadow-sm">
-                    {/* Search Bar */}
-                    <div className="relative w-80">
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input 
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search active orders, tickets..."
-                            className="w-full bg-white border border-[#C8843B]/10 rounded-xl py-2 pl-9 pr-4 text-xs font-semibold focus:outline-none focus:border-[#C8843B]/30 transition-all text-gray-700 shadow-inner"
-                        />
+            {/* MAIN CONTENT */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* HEADER */}
+                <header className="h-20 bg-white/50 backdrop-blur-md flex items-center justify-between px-8 shrink-0 z-20">
+                    <div>
+                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Staff Dashboard</h1>
+                        <p className="text-sm text-gray-500 font-medium">Welcome back, {user?.name || 'Staff'}!</p>
                     </div>
-
-                    {/* Clock & Status Header Actions */}
-                    <div className="flex items-center gap-4">
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/50 px-3 py-1.5 rounded-full text-[10px] font-black text-emerald-800 shadow-sm animate-pulse">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                            <span>Kitchen Live</span>
+                    
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4 text-sm font-semibold text-gray-600 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
+                            <span className="cursor-pointer hover:text-[#C8843B] transition-colors">Subscription</span>
+                            <div className="w-px h-4 bg-gray-200"></div>
+                            <span className="cursor-pointer hover:text-[#C8843B] transition-colors">Analytics</span>
                         </div>
-
-                        {/* Shift details */}
-                        <div className="hidden md:flex flex-col text-right">
-                            <span className="text-[10px] text-[#C8843B] font-black uppercase tracking-wider flex items-center justify-end gap-1">
-                                <Clock className="w-3 h-3" /> {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </span>
-                            <span className="text-[9px] text-gray-400 font-bold">
-                                {time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                            </span>
+                        
+                        <div className="relative">
+                            <button className="relative p-2 text-gray-400 hover:text-[#C8843B] hover:bg-[#C8843B]/10 rounded-xl transition-colors">
+                                <Bell className="w-6 h-6" />
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                            </button>
                         </div>
                     </div>
                 </header>
 
-                {/* DASHBOARD CONTENT BODY */}
-                <main className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    
-                    {/* WELCOME SECTION HERO */}
-                    <ScrollReveal variant="fade-up" duration={700}>
-                        <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#2E1A12] to-[#422C21] p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-                            {/* Graphic elements */}
-                            <div className="absolute right-0 top-0 w-80 h-full opacity-10 bg-[radial-gradient(circle_at_right,_var(--tw-gradient-stops))] from-white to-transparent pointer-events-none"></div>
-                            
-                            <div className="space-y-2 relative z-10">
-                                <div className="flex items-center gap-2">
-                                    <Sparkles className="w-5 h-5 text-[#C8843B] animate-bounce" />
-                                    <span className="text-[10px] font-black tracking-widest text-[#C8843B] uppercase">Smart Bake Hub Console</span>
+                {/* SCROLLABLE MAIN AREA */}
+                <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                    {activeTab === 'dashboard' && (
+                        <>
+                            {/* TOP KPI CARDS */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        {/* KPI 1 */}
+                        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 relative overflow-hidden group">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-2 text-gray-500 font-semibold text-sm">
+                                    <FileText className="w-4 h-4 text-[#C8843B]" /> Pending Orders
                                 </div>
-                                <h1 className="text-2xl md:text-3xl font-extrabold font-serif">Good Morning, {user?.name || 'Sarah'} 👋</h1>
-                                <p className="text-xs text-gray-300/80 font-medium">Your Morning Shift is active. Kitchen load is steady today.</p>
+                                <span className="text-3xl font-black text-gray-900">{kpiSummary.pending}</span>
                             </div>
-
-                            {/* Shift stats */}
-                            <div className="flex gap-4 relative z-10 shrink-0">
-                                <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 min-w-[100px] text-center shadow-inner">
-                                    <div className="text-[9px] font-bold text-gray-300 uppercase">Shift Time</div>
-                                    <div className="text-sm font-black mt-0.5">Morning Shift</div>
-                                </div>
-                                <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 min-w-[100px] text-center shadow-inner">
-                                    <div className="text-[9px] font-bold text-gray-300 uppercase">Completed</div>
-                                    <div className="text-sm font-black mt-0.5">18 Orders</div>
-                                </div>
-                                <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 min-w-[100px] text-center shadow-inner">
-                                    <div className="text-[9px] font-bold text-gray-300 uppercase">In Queue</div>
-                                    <div className="text-sm font-black mt-0.5">9 Active</div>
-                                </div>
+                            <div className="flex justify-between items-center text-xs font-bold text-gray-400 mb-2">
+                                <span>Total {orders.length}</span>
+                                <span className="text-gray-900">{Math.round((kpiSummary.pending/orders.length)*100) || 0}%</span>
+                            </div>
+                            <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full rounded-full bg-gradient-to-r from-[#2E1A12] to-[#C8843B]"
+                                    style={{ 
+                                        width: `${Math.round((kpiSummary.pending/orders.length)*100) || 0}%`,
+                                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.2) 4px, rgba(255,255,255,0.2) 8px)'
+                                    }}
+                                ></div>
                             </div>
                         </div>
-                    </ScrollReveal>
 
-                    {/* KPI CARDS SUMMARY */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                            { name: 'Pending Tickets', value: kpiSummary.pending, color: 'border-orange-200/50 bg-orange-50/30 text-orange-700', progress: 40, trend: '+4 min avg' },
-                            { name: 'Preparing Queue', value: kpiSummary.preparing, color: 'border-blue-200/50 bg-blue-50/30 text-blue-700', progress: 65, trend: '8 in pipeline' },
-                            { name: 'Ready for Pickup', value: kpiSummary.ready, color: 'border-emerald-200/50 bg-emerald-50/30 text-emerald-700', progress: 85, trend: 'Table 4 waiting' },
-                            { name: 'Completed Today', value: kpiSummary.completed, color: 'border-teal-200/50 bg-teal-50/30 text-teal-700', progress: 100, trend: '100% fulfill' }
-                        ].map((card, idx) => (
-                            <ScrollReveal key={card.name} variant="fade-up" delay={idx * 50}>
-                                <div className={`p-4 rounded-2xl border bg-white shadow-sm flex flex-col justify-between relative overflow-hidden h-28`}>
-                                    <div className="flex justify-between items-start">
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{card.name}</span>
-                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${card.color}`}>{card.trend}</span>
-                                    </div>
-                                    <div className="my-2">
-                                        <span className="text-3xl font-black text-[#2E1A12]">{card.value}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden">
-                                        <div className="bg-[#C8843B] h-full rounded-full" style={{ width: `${card.progress}%` }}></div>
-                                    </div>
+                        {/* KPI 2 */}
+                        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 relative overflow-hidden group">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-2 text-gray-500 font-semibold text-sm">
+                                    <ListTodo className="w-4 h-4 text-[#C8843B]" /> Orders in Progress
                                 </div>
-                            </ScrollReveal>
-                        ))}
+                                <span className="text-3xl font-black text-gray-900">{kpiSummary.preparing}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-bold text-gray-400 mb-2">
+                                <span>Total {orders.length}</span>
+                                <span className="text-gray-900">{Math.round((kpiSummary.preparing/orders.length)*100) || 0}%</span>
+                            </div>
+                            <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full rounded-full bg-gradient-to-r from-[#2E1A12] to-[#C8843B]"
+                                    style={{ 
+                                        width: `${Math.round((kpiSummary.preparing/orders.length)*100) || 0}%`,
+                                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.2) 4px, rgba(255,255,255,0.2) 8px)'
+                                    }}
+                                ></div>
+                            </div>
+                        </div>
+
+                        {/* KPI 3 */}
+                        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 relative overflow-hidden group">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-2 text-gray-500 font-semibold text-sm">
+                                    <Box className="w-4 h-4 text-[#C8843B]" /> Inventory Alerts
+                                </div>
+                                <span className="text-3xl font-black text-gray-900">{inventory.length}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-bold text-gray-400 mb-2">
+                                <span>Action Required</span>
+                                <span className="text-[#C8843B]">Critical</span>
+                            </div>
+                            <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full rounded-full bg-gradient-to-r from-[#2E1A12] to-[#C8843B]"
+                                    style={{ 
+                                        width: '40%',
+                                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.2) 4px, rgba(255,255,255,0.2) 8px)'
+                                    }}
+                                ></div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* LIVE ORDER KANBAN BOARD */}
-                    <ScrollReveal variant="fade-up" delay={200}>
-                        <div className="bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] space-y-4">
-                            <div className="flex justify-between items-center pb-4 border-b border-[#F7F4ED]">
+                    {/* MAIN MIDDLE ROW */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        
+                        {/* Revenue Chart */}
+                        <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h2 className="text-lg font-bold font-serif text-[#2E1A12]">Live Kanban Order Operations</h2>
-                                    <p className="text-xs text-gray-400 font-medium">Quickly switch ticket statuses as orders process in the kitchen</p>
+                                    <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">Total Revenue</h2>
+                                    <p className="text-xs font-semibold text-gray-400">Sales Overview</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => {
-                                            setOrders(prev => prev.map(o => ({ ...o, status: 'Pending' })));
-                                            toast('All orders reset to Pending', { icon: '🔄' });
-                                        }}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 hover:text-gray-900 rounded-xl text-xs font-bold transition-all cursor-pointer hover:shadow-sm"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5" /> Reset Board
-                                    </button>
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 text-sm font-semibold cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <Calendar className="w-4 h-4 text-gray-500" />
+                                    This Month <ChevronDown className="w-3 h-3 text-gray-400" />
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                                {['Pending', 'Accepted', 'Preparing', 'Ready', 'Completed'].map((column) => (
-                                    <div key={column} className="bg-gray-50/50 p-3 rounded-2xl border border-gray-100 flex flex-col min-h-[350px]">
-                                        <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-                                            <span className="text-xs font-black text-[#2E1A12] uppercase tracking-wider">{column}</span>
-                                            <span className="bg-[#C8843B]/10 text-[#C8843B] text-[10px] px-2 py-0.5 rounded-full font-extrabold">
-                                                {orders.filter(o => o.status === column).length}
-                                            </span>
-                                        </div>
-
-                                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px]">
-                                            {orders.filter(o => o.status === column).map((order) => (
-                                                <div 
-                                                    key={order.id}
-                                                    className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm space-y-3 hover:border-[#C8843B]/30 transition-all text-xs"
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-black text-[#2E1A12]">#{order.id}</span>
-                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                                            order.priority === 'High' ? 'bg-red-50 text-red-700 border border-red-100' :
-                                                            order.priority === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                            'bg-gray-100 text-gray-600'
-                                                        }`}>
-                                                            {order.priority}
-                                                        </span>
-                                                    </div>
-
-                                                    <div>
-                                                        <div className="font-extrabold text-[#2E1A12]">{order.customer}</div>
-                                                        <div className="text-[10px] text-gray-400 font-bold">{order.type}</div>
-                                                    </div>
-
-                                                    <p className="text-[#2E1A12]/80 font-medium text-[11px] leading-relaxed border-t border-[#F7F4ED] pt-2">
-                                                        {order.items}
-                                                    </p>
-
-                                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium bg-gray-50/50 p-2 rounded-lg">
-                                                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-[#C8843B]" /> {order.elapsed}m in state</span>
-                                                        <span>Est: {order.est}</span>
-                                                    </div>
-
-                                                    {/* Kanban Actions */}
-                                                    <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-[#F7F4ED]">
-                                                        {column === 'Pending' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => moveOrder(order.id, 'Accepted')}
-                                                                    className="w-full bg-[#2E1A12] hover:bg-[#C8843B] text-white py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
-                                                                >
-                                                                    Accept
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => moveOrder(order.id, 'Completed')}
-                                                                    className="w-full border border-gray-200 hover:border-red-300 text-gray-400 hover:text-red-500 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer"
-                                                                >
-                                                                    Skip
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {column === 'Accepted' && (
-                                                            <button 
-                                                                onClick={() => moveOrder(order.id, 'Preparing')}
-                                                                className="w-full col-span-2 bg-[#2E1A12] hover:bg-[#C8843B] text-white py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
-                                                            >
-                                                                <Play className="w-3 h-3 text-[#C8843B]" /> Prep Order
-                                                            </button>
-                                                        )}
-                                                        {column === 'Preparing' && (
-                                                            <button 
-                                                                onClick={() => moveOrder(order.id, 'Ready')}
-                                                                className="w-full col-span-2 bg-[#C8843B] hover:bg-[#2E1A12] text-white py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
-                                                            >
-                                                                <Check className="w-3 h-3" /> Ready
-                                                            </button>
-                                                        )}
-                                                        {column === 'Ready' && (
-                                                            <button 
-                                                                onClick={() => moveOrder(order.id, 'Completed')}
-                                                                className="w-full col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
-                                                            >
-                                                                <CheckCircle2 className="w-3 h-3" /> Complete
-                                                            </button>
-                                                        )}
-                                                        {column === 'Completed' && (
-                                                            <div className="col-span-2 text-center text-emerald-600 font-extrabold text-[10px] bg-emerald-50 border border-emerald-100 py-1 rounded-lg">
-                                                                Completed ✅
+                            <div className="flex-1 min-h-[250px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis 
+                                            dataKey="name" 
+                                            axisLine={false} 
+                                            tickLine={false} 
+                                            tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 600 }} 
+                                            dy={10}
+                                        />
+                                        <YAxis 
+                                            axisLine={false} 
+                                            tickLine={false} 
+                                            tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 600 }}
+                                        />
+                                        <RechartsTooltip 
+                                            cursor={{fill: 'transparent'}}
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    return (
+                                                        <div className="bg-gray-900 text-white px-4 py-2 rounded-xl shadow-xl">
+                                                            <div className="font-bold text-lg flex items-center gap-1">
+                                                                <span className="text-[#C8843B]">Rs</span> {payload[0].value}k
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {orders.filter(o => o.status === column).length === 0 && (
-                                                <div className="text-center text-gray-300 py-8 text-[11px] font-medium italic border-2 border-dashed border-gray-100 rounded-xl">
-                                                    Empty
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                                                            <div className="text-[10px] text-gray-300">Revenue in {payload[0].payload.name}</div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Bar dataKey="value" fill="#C8843B" radius={[8, 8, 8, 8]} barSize={24} />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
-                    </ScrollReveal>
 
-                    {/* KITCHEN TIMELINE QUEUE */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        
-                        {/* Kitchen Queue Timeline (7 columns) */}
-                        <ScrollReveal variant="fade-up" className="lg:col-span-7 bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] space-y-4 flex flex-col">
-                            <div>
-                                <h2 className="text-lg font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                    <ListTodo className="w-5 h-5 text-[#C8843B]" />
-                                    <span>Active Kitchen Prep Timeline</span>
-                                </h2>
-                                <p className="text-xs text-gray-400 font-medium">Prioritized sequence of items currently on grill or prep tables</p>
+                        {/* Business Data & Stores */}
+                        <div className="space-y-6">
+                            
+                            {/* Business Data */}
+                            <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">Business Data</h2>
+                                    <div className="flex items-center gap-1 px-3 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
+                                        This Week <ChevronDown className="w-3 h-3" />
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {/* Stat 1 */}
+                                    <div className="bg-[#F8FAFC] p-4 rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-[#F1F5F9] transition-colors">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-gray-400 mb-1">Number of Customers</div>
+                                            <div className="flex items-center gap-2 text-xl font-black text-gray-900">
+                                                <Users className="w-4 h-4 text-gray-400" /> 197
+                                            </div>
+                                        </div>
+                                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#C8843B] shadow-sm">
+                                            <ArrowUpRight className="w-3 h-3" />
+                                        </div>
+                                    </div>
+                                    {/* Stat 2 */}
+                                    <div className="bg-[#FFF4ED] p-4 rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-[#FFEDDF] transition-colors">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-[#C8843B] mb-1">Total Orders</div>
+                                            <div className="flex items-center gap-2 text-xl font-black text-[#C8843B]">
+                                                <ShoppingBag className="w-4 h-4" /> {orders.length > 0 ? orders.length : 270}
+                                            </div>
+                                        </div>
+                                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-[#C8843B] group-hover:text-[#C8843B] shadow-sm">
+                                            <ArrowUpRight className="w-3 h-3" />
+                                        </div>
+                                    </div>
+                                    {/* Stat 3 */}
+                                    <div className="bg-[#F8FAFC] p-4 rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-[#F1F5F9] transition-colors">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-gray-400 mb-1">Average Order Values</div>
+                                            <div className="flex items-center gap-2 text-xl font-black text-gray-900">
+                                                Rs 1250.00
+                                            </div>
+                                        </div>
+                                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#C8843B] shadow-sm">
+                                            <ArrowUpRight className="w-3 h-3" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="space-y-4 overflow-y-auto max-h-[360px] pr-1.5 custom-scrollbar">
-                                {kitchenQueue.map((item, idx) => (
-                                    <div 
-                                        key={item.id}
-                                        className="relative pl-6 border-l-2 border-[#C8843B]/20 py-2 space-y-2"
-                                    >
-                                        <div className="absolute left-[-5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#C8843B]"></div>
-                                        <div className="flex justify-between items-start text-xs font-semibold">
-                                            <div>
-                                                <span className="font-black text-[#2E1A12]">Ticket #{item.id}</span>
-                                                <span className="text-gray-400 mx-2">•</span>
-                                                <span className="text-gray-600 font-extrabold">{item.customer}</span>
+                        </div>
+                    </div>
+
+                    {/* BOTTOM ROW */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        {/* Recent Activity */}
+                        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">Recent Activity</h2>
+                                <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer transition-colors">
+                                    <ArrowUpRight className="w-4 h-4" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                {recentOrders.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-gray-500 font-medium">No pending orders right now.</div>
+                                ) : (
+                                    recentOrders.map((order) => (
+                                        <div key={order.id} className="flex items-start gap-4 p-4 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                                            <div className="w-12 h-12 rounded-2xl bg-[#C8843B]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <ShoppingBag className="w-6 h-6 text-[#C8843B]" />
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                                item.priority === 'High' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700'
-                                            }`}>
-                                                {item.priority} Urgency
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-gray-900 mb-1">Order #{order.id}</h4>
+                                                <p className="text-xs text-gray-500 truncate">
+                                                    {order.items?.map(item => `${item.quantity}x ${item.item_name || item.product_name || item.menu_name || item.beverage_name || 'Item'}`).join(', ') || 'Various items'}
+                                                </p>
+                                                <div className="flex gap-2 w-full mt-4">
+                                                    <button 
+                                                        onClick={() => handleOrderStatus(order.id, 'accepted')}
+                                                        className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-xl text-sm font-bold transition-colors">
+                                                        Accept
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleOrderStatus(order.id, 'cancelled')}
+                                                        className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-600 py-2 rounded-xl text-sm font-bold transition-colors">
+                                                        Decline
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs font-semibold text-gray-400">
+                                                {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                             </span>
                                         </div>
-
-                                        <p className="text-xs text-gray-600 font-medium bg-gray-50/50 p-2.5 rounded-xl border border-gray-100">
-                                            {item.items}
-                                        </p>
-
-                                        <div className="flex flex-wrap gap-4 text-[10px] text-gray-400 font-bold pt-1">
-                                            <span>Assigned Chef: Head Baker (John)</span>
-                                            <span>Prep Target: {item.est}</span>
-                                            <span className="text-amber-600 animate-pulse">Est. Time Left: ~5m</span>
-                                        </div>
-                                    </div>
-                                ))}
-                                {kitchenQueue.length === 0 && (
-                                    <div className="text-center text-gray-400 py-12 text-xs italic font-semibold">
-                                        No active prep orders in queue
-                                    </div>
+                                    ))
                                 )}
                             </div>
-                        </ScrollReveal>
+                        </div>
 
-                        {/* Inventory Snapshot (5 columns) */}
-                        <ScrollReveal variant="fade-up" className="lg:col-span-5 bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] flex flex-col justify-between">
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <h2 className="text-lg font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                            <Box className="w-5 h-5 text-[#C8843B]" />
-                                            <span>Inventory Snapshot</span>
-                                        </h2>
-                                        <p className="text-xs text-gray-400 font-medium">Critical items requiring immediate re-stock or replacement</p>
-                                    </div>
-                                    <button 
-                                        onClick={() => openInventoryDrawer(null)}
-                                        className="p-2 bg-[#2E1A12] hover:bg-[#C8843B] text-white rounded-xl shadow-sm cursor-pointer transition-colors"
-                                        title="Scan / Update Stock"
-                                    >
-                                        <QrCode className="w-4 h-4 text-[#C8843B]" />
-                                    </button>
-                                </div>
-
-                                <div className="space-y-2">
-                                    {inventory.map((item) => (
-                                        <div 
-                                            key={item.id}
-                                            onClick={() => openInventoryDrawer(item)}
-                                            className="p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between text-xs cursor-pointer transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-base">📦</span>
-                                                <div>
-                                                    <div className="font-extrabold text-[#2E1A12]">{item.name}</div>
-                                                    <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{item.type}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="text-right">
-                                                <div className="font-black text-[#2E1A12]">{item.count} {item.unit}</div>
-                                                <span className={`inline-block px-2 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider mt-1 ${
-                                                    item.status === 'critical' ? 'bg-red-50 text-red-700 border border-red-100' :
-                                                    item.status === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                    'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                                }`}>
-                                                    {item.status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
+                        {/* Top Dishes */}
+                        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] border border-gray-50 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">Top Dishes</h2>
+                                <div className="flex items-center gap-1 px-3 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <Calendar className="w-3 h-3" /> This Month <ChevronDown className="w-3 h-3" />
                                 </div>
                             </div>
-                        </ScrollReveal>
 
-                    </div>
-
-                    {/* EVENT SUPPORT & CUSTOMER CHATS */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        
-                        {/* Event Support Calendar (6 columns) */}
-                        <ScrollReveal variant="fade-up" className="lg:col-span-6 bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] space-y-4">
-                            <div>
-                                <h2 className="text-lg font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                    <Calendar className="w-5 h-5 text-[#C8843B]" />
-                                    <span>Event Bookings Support</span>
-                                </h2>
-                                <p className="text-xs text-gray-400 font-medium">Bespoke bulk orders set for delivery or pickup today</p>
-                            </div>
-
-                            <div className="space-y-3">
-                                {[
-                                    { title: 'Sarah Birthday Tier Cake', time: '11:30 AM', status: 'Fully Paid', notes: 'Include "Happy 10th Birthday" gold topper' },
-                                    { title: 'Corporate High-Tea Platter', time: '02:00 PM', status: 'Deposit Paid', notes: 'Deliver to Hatton National Bank, Colombo' },
-                                    { title: 'Wedding Reception Assortments', time: '05:30 PM', status: 'Pending Balance', notes: 'Deliver direct to Kingsbury Grand Ballroom' }
-                                ].map((ev, idx) => (
-                                    <div 
-                                        key={idx}
-                                        className="p-3 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-2 text-xs font-semibold"
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-extrabold text-[#2E1A12]">{ev.title}</span>
-                                            <span className="text-[10px] font-black text-[#C8843B] bg-[#F7F4ED] px-2 py-0.5 rounded border border-[#C8843B]/10">{ev.time}</span>
-                                        </div>
-                                        <p className="text-[10px] text-gray-400 font-bold leading-relaxed">{ev.notes}</p>
-                                        <div className="flex justify-between items-center pt-1 border-t border-[#F7F4ED]">
-                                            <span className="text-[8px] font-bold text-gray-400 uppercase">Payment</span>
-                                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                                ev.status === 'Fully Paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                                            }`}>{ev.status}</span>
+                            <div className="space-y-5 flex-1">
+                                {topDishes.map((dish, idx) => (
+                                    <div key={idx} className="flex items-center gap-4">
+                                        <img src={dish.img} alt={dish.name} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-end mb-2">
+                                                <span className="text-sm font-bold text-gray-700">{dish.name}</span>
+                                                <span className="text-sm font-black text-gray-900">{dish.value}</span>
+                                            </div>
+                                            <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full rounded-full bg-gradient-to-r from-[#FF7A45] to-[#FF5722]"
+                                                    style={{ 
+                                                        width: `${(dish.value / 1000) * 100}%`,
+                                                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.2) 4px, rgba(255,255,255,0.2) 8px)'
+                                                    }}
+                                                ></div>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </ScrollReveal>
-
-                        {/* Customer Chats Panel (6 columns) */}
-                        <ScrollReveal variant="fade-up" className="lg:col-span-6 bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] flex flex-col justify-between gap-4">
-                            <div className="space-y-4">
-                                <div>
-                                    <h2 className="text-lg font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                        <MessageSquare className="w-5 h-5 text-[#C8843B]" />
-                                        <span>Customer Chats Live</span>
-                                    </h2>
-                                    <p className="text-xs text-gray-400 font-medium">Respond to inquiries and special instructions instantly</p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* User Lists */}
-                                    <div className="space-y-2 border-r border-[#F7F4ED] pr-2">
-                                        {chats.map((c) => (
-                                            <div 
-                                                key={c.id}
-                                                onClick={() => setSelectedChatUser(c)}
-                                                className={`p-2.5 rounded-xl border cursor-pointer text-xs transition-colors ${
-                                                    selectedChatUser?.id === c.id 
-                                                        ? 'bg-[#2E1A12] border-[#2E1A12] text-white' 
-                                                        : 'bg-gray-50/50 border-gray-100 text-[#2E1A12] hover:bg-gray-50'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <span className="font-extrabold">{c.name}</span>
-                                                    {c.unread > 0 && (
-                                                        <span className="bg-red-500 text-white text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center font-bold">
-                                                            {c.unread}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-[10px] text-gray-400 truncate mt-1 font-semibold">{c.msg}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Chat Details Box */}
-                                    <div className="flex flex-col justify-between min-h-[180px] text-xs">
-                                        {selectedChatUser ? (
-                                            <div className="flex flex-col justify-between h-full space-y-2">
-                                                <div className="space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar">
-                                                    {selectedChatUser.messages.map((m, idx) => (
-                                                        <div key={idx} className={`p-2 rounded-xl max-w-[85%] font-medium ${
-                                                            m.sender === 'customer' 
-                                                                ? 'bg-gray-100 text-gray-800' 
-                                                                : 'bg-[#C8843B]/20 text-[#2E1A12] self-end ml-auto'
-                                                        }`}>
-                                                            {m.text}
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                <form onSubmit={handleSendChatReply} className="space-y-2 border-t border-[#F7F4ED] pt-2">
-                                                    <div className="flex gap-1">
-                                                        {['Yes, available!', 'Sure!'].map(t => (
-                                                            <button 
-                                                                key={t}
-                                                                type="button" 
-                                                                onClick={() => applyQuickTemplate(t)}
-                                                                className="px-2 py-0.5 bg-gray-50 border border-gray-200 text-gray-500 hover:text-gray-900 rounded text-[9px] font-bold cursor-pointer"
-                                                            >
-                                                                {t}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    <div className="relative">
-                                                        <input 
-                                                            type="text" 
-                                                            value={chatReplyText}
-                                                            onChange={(e) => setChatReplyText(e.target.value)}
-                                                            placeholder="Type reply..."
-                                                            className="w-full bg-gray-50/50 border border-gray-200 rounded-xl py-2 pl-3 pr-8 text-[11px] font-semibold outline-none focus:border-[#C8843B]/40"
-                                                        />
-                                                        <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 text-[#C8843B] hover:text-[#2E1A12] cursor-pointer">
-                                                            <Send className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center text-gray-400 font-semibold italic flex items-center justify-center h-full">
-                                                Select a conversation to reply
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </ScrollReveal>
+                        </div>
 
                     </div>
+                        </>
+                    )}
 
-                    {/* PERFORMANCE CHARTS */}
-                    <ScrollReveal variant="fade-up" delay={250}>
-                        <div className="bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] space-y-4">
-                            <div>
-                                <h2 className="text-lg font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-[#C8843B]" />
-                                    <span>Hourly Bakery Load & Metrics</span>
-                                </h2>
-                                <p className="text-xs text-gray-400 font-medium">Daily analytics feed showing busy slots and popular items</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                                {/* Line Chart (8 cols) */}
-                                <div className="md:col-span-8 h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={hourlyOrdersData}>
-                                            <defs>
-                                                <linearGradient id="orderGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#C8843B" stopOpacity={0.2}/>
-                                                    <stop offset="95%" stopColor="#C8843B" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#F7F4ED" />
-                                            <XAxis dataKey="hour" stroke="#A3A3A3" fontSize={9} />
-                                            <YAxis stroke="#A3A3A3" fontSize={9} />
-                                            <RechartsTooltip />
-                                            <Area type="monotone" dataKey="orders" stroke="#C8843B" strokeWidth={2} fillOpacity={1} fill="url(#orderGrad)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-
-                                {/* Pie chart summary (4 cols) */}
-                                <div className="md:col-span-4 h-[250px] flex flex-col justify-between">
-                                    <div className="h-[180px] relative">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={popularItemsData}
-                                                    innerRadius={50}
-                                                    outerRadius={70}
-                                                    paddingAngle={3}
-                                                    dataKey="value"
-                                                >
-                                                    {popularItemsData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                                    ))}
-                                                </Pie>
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 border-t border-[#F7F4ED] pt-2">
-                                        {popularItemsData.map((item) => (
-                                            <div key={item.name} className="flex items-center gap-1.5">
-                                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                                <span>{item.name} ({item.value}%)</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                    {activeTab === 'orders' && <Orders />}
+                    {activeTab === 'kitchen' && <Orders />}
+                    {activeTab === 'inventory' && <ProductMenuManagement />}
+                    {activeTab === 'tables' && <TablesManagement />}
+                    {activeTab === 'events' && <Events />}
+                    {activeTab === 'chat' && <ChatSupport />}
+                    {activeTab === 'settings' && <SettingsPage />}
+                    {activeTab === 'help' && (
+                        <div className="bg-white p-12 rounded-3xl text-center shadow-sm">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Help & Support</h2>
+                            <p className="text-gray-500">Please contact the system administrator for assistance.</p>
                         </div>
-                    </ScrollReveal>
-
-                    {/* SYSTEM ALERT / LOG FEED */}
-                    <ScrollReveal variant="fade-up" delay={300} className="bg-white p-6 rounded-[28px] border border-[#C8843B]/10 shadow-[0_8px_30px_rgba(46,26,18,0.01)] flex flex-col gap-4">
-                        <div>
-                            <h2 className="text-lg font-bold font-serif text-[#2E1A12]">Staff System Alert Ledger</h2>
-                            <p className="text-xs text-gray-400 font-medium">Critical background updates regarding web shop and logistics</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {notifications.map((n) => (
-                                <div 
-                                    key={n.id}
-                                    className="p-3.5 bg-gray-50 border border-gray-200/50 rounded-2xl text-xs font-semibold relative space-y-1"
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                            n.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' :
-                                            n.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                            'bg-blue-50 text-blue-700 border border-blue-100'
-                                        }`}>{n.type}</span>
-                                        <span className="text-[9px] text-gray-400 font-bold">{n.time}</span>
-                                    </div>
-                                    <h4 className="font-extrabold text-[#2E1A12] text-xs pt-1">{n.title}</h4>
-                                    <p className="text-[10px] text-gray-400 leading-relaxed font-bold">{n.desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollReveal>
-
-                    {/* QUICK ACTIONS BAR */}
-                    <ScrollReveal variant="fade-up" className="flex flex-wrap gap-3 items-center justify-between p-4 bg-[#FAF5EE] border border-[#C8843B]/10 rounded-[24px]">
-                        <div className="text-xs font-bold text-gray-500">Quick Staff Operations Bar</div>
-                        <div className="flex flex-wrap gap-2.5">
-                            <button 
-                                onClick={() => openInventoryDrawer(null)}
-                                className="flex items-center gap-1.5 bg-[#2E1A12] hover:bg-[#C8843B] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                            >
-                                <Plus className="w-4 h-4 text-[#C8843B]" /> Update Inventory
-                            </button>
-                            <button 
-                                onClick={() => window.print()}
-                                className="flex items-center gap-1.5 bg-white border border-gray-200 text-[#2E1A12] px-4 py-2.5 rounded-2xl text-xs font-bold transition-all hover:border-[#C8843B]/30 shadow-sm cursor-pointer"
-                            >
-                                <Printer className="w-4 h-4" /> Print Kitchen Tickets
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    toast.success("Shift performance summary downloaded as PDF");
-                                }}
-                                className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                            >
-                                <FileText className="w-4 h-4 text-emerald-600" /> Print Shift Report
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    toast.error("Bakery technical issue reported to admin panel.");
-                                }}
-                                className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                            >
-                                <AlertCircle className="w-4 h-4 text-rose-600" /> Report Device Outage
-                            </button>
-                        </div>
-                    </ScrollReveal>
+                    )}
                 </main>
             </div>
-
-            {/* INVENTORY UPDATE POPUP DRAWER */}
-            {isInventoryDrawerOpen && selectedInventoryProduct && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    {/* Backdrop */}
-                    <div 
-                        onClick={() => setIsInventoryDrawerOpen(false)}
-                        className="absolute inset-0 bg-[#2E1A12]/30 backdrop-blur-sm"
-                    />
-                    
-                    {/* Content */}
-                    <div className="relative w-full max-w-md h-full bg-[#FFF8F0] shadow-2xl p-8 overflow-y-auto flex flex-col justify-between z-10 border-l border-[#C8843B]/10">
-                        <div className="space-y-6">
-                            <div>
-                                <h2 className="text-xl font-bold font-serif text-[#2E1A12] flex items-center gap-2">
-                                    <Box className="w-6 h-6 text-[#C8843B]" />
-                                    <span>Quick Inventory Manager</span>
-                                </h2>
-                                <p className="text-xs text-gray-400 font-medium mt-1">Scan or manually update active stock volume counts.</p>
-                            </div>
-
-                            <form onSubmit={handleSaveInventory} className="space-y-5 text-xs font-semibold">
-                                {/* Search & Barcode Sim */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-500 uppercase">Product Name / Barcode</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="text"
-                                            value={selectedInventoryProduct.name}
-                                            onChange={(e) => setSelectedInventoryProduct({ ...selectedInventoryProduct, name: e.target.value })}
-                                            className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 outline-none focus:border-[#C8843B]/50"
-                                            placeholder="Enter item name"
-                                            required
-                                        />
-                                        <button 
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedInventoryProduct({ ...selectedInventoryProduct, name: 'Premium Cocoa Powder', unit: 'kg' });
-                                                toast.success('Barcode scan successful!');
-                                            }}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-[#FAF5EE] border border-[#C8843B]/10 rounded-lg text-gray-500 hover:text-black cursor-pointer"
-                                            title="Simulate Barcode Scan"
-                                        >
-                                            <QrCode className="w-4 h-4 text-[#C8843B]" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Count Controller */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-500 uppercase">Stock Count ({selectedInventoryProduct.unit})</label>
-                                    <div className="flex items-center gap-3">
-                                        <button 
-                                            type="button"
-                                            onClick={() => setSelectedInventoryProduct({ ...selectedInventoryProduct, count: Math.max(0, selectedInventoryProduct.count - 1) })}
-                                            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-lg hover:border-black cursor-pointer"
-                                        >
-                                            <Minus className="w-4 h-4" />
-                                        </button>
-                                        <input 
-                                            type="number" 
-                                            value={selectedInventoryProduct.count}
-                                            onChange={(e) => setSelectedInventoryProduct({ ...selectedInventoryProduct, count: parseInt(e.target.value) || 0 })}
-                                            className="w-20 text-center bg-white border border-gray-200 rounded-xl py-2.5 text-sm font-black focus:outline-none"
-                                        />
-                                        <button 
-                                            type="button"
-                                            onClick={() => setSelectedInventoryProduct({ ...selectedInventoryProduct, count: selectedInventoryProduct.count + 1 })}
-                                            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-lg hover:border-black cursor-pointer"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Status select */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-500 uppercase">Stock Status Level</label>
-                                    <select
-                                        value={selectedInventoryProduct.status}
-                                        onChange={(e) => setSelectedInventoryProduct({ ...selectedInventoryProduct, status: e.target.value })}
-                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 focus:outline-none"
-                                    >
-                                        <option value="good">good (Satisfactory)</option>
-                                        <option value="warning">warning (Near Expiry/Low)</option>
-                                        <option value="critical">critical (Critical Re-stock)</option>
-                                        <option value="out">out (Out of Stock)</option>
-                                    </select>
-                                </div>
-
-                                {/* Availability Toggle */}
-                                <div className="flex items-center justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
-                                    <div>
-                                        <div className="font-extrabold text-[#2E1A12]">Available to Web Shop</div>
-                                        <div className="text-[10px] text-gray-400 font-bold">Display in menus and accept orders online</div>
-                                    </div>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setSelectedInventoryProduct({
-                                            ...selectedInventoryProduct,
-                                            status: selectedInventoryProduct.status === 'out' ? 'good' : 'out'
-                                        })}
-                                        className={`w-10 h-6 rounded-full p-1 transition-colors cursor-pointer ${
-                                            selectedInventoryProduct.status !== 'out' ? 'bg-emerald-500' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                                            selectedInventoryProduct.status !== 'out' ? 'translate-x-4' : 'translate-x-0'
-                                        }`} />
-                                    </button>
-                                </div>
-
-                                <div className="pt-6 border-t border-[#F7F4ED] flex gap-3">
-                                    <button 
-                                        type="submit"
-                                        className="flex-1 bg-[#2E1A12] hover:bg-[#C8843B] text-white py-3.5 rounded-xl font-black text-xs transition-colors cursor-pointer"
-                                    >
-                                        Save Changes
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsInventoryDrawerOpen(false)}
-                                        className="flex-1 border border-gray-200 text-gray-500 hover:bg-gray-50 py-3.5 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            
             <LogoutConfirmation 
-                isOpen={showLogoutModal}
-                onConfirm={handleConfirmLogout}
-                onCancel={() => setShowLogoutModal(false)}
+                isOpen={showLogoutModal} 
+                onClose={() => setShowLogoutModal(false)} 
+                onConfirm={handleConfirmLogout} 
             />
         </div>
     );

@@ -58,8 +58,11 @@ const PrivateRoute = ({ children, roles }) => {
     }
     
     if (roles && !roles.includes(user.role)) {
-        if (user.role === 'admin' || user.role === 'staff') {
+        if (user.role === 'admin') {
             return <Navigate to="/admin" />;
+        }
+        if (user.role === 'staff') {
+            return <Navigate to="/staff" />;
         }
         return <Navigate to="/" />;
     }
