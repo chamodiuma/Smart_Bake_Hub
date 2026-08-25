@@ -55,11 +55,24 @@ const placeOrder = async (req, res) => {
             const productId = item.productId || null;
             const menuId = item.menuId || null;
             const beverageId = item.beverageId || null;
+            const itemName = item.name || null;
 
             await pool.query(
                 'INSERT INTO order_items (order_id, product_id, menu_id, beverage_id, item_name, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [orderId, productId, menuId, beverageId, item.name || null, item.quantity, item.price]
+                [orderId, productId, menuId, beverageId, itemName, item.quantity, item.price]
             );
+
+            // Auto Stock-Out: Deduct from inventory if the item exists in inventory_items
+            if (itemName) {
+                try {
+                    await pool.query(
+                        'UPDATE inventory_items SET stock_quantity = stock_quantity - ? WHERE item_name = ?',
+                        [item.quantity, itemName]
+                    );
+                } catch (err) {
+                    console.error('Failed to deduct inventory for:', itemName, err);
+                }
+            }
         }
 
         // Insert Notification for Admin

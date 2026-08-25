@@ -3,7 +3,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import { 
-    Calendar, Filter, TrendingUp, ArrowUp, RefreshCw, Loader2, Download, Check, SlidersHorizontal, ArrowUpDown, ChevronDown
+    Calendar, Filter, TrendingUp, ArrowUp, RefreshCw, Loader2, Download, Check, SlidersHorizontal, ArrowUpDown, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import api from "../../services/api";
 import toast from 'react-hot-toast';
@@ -117,6 +117,7 @@ const Dashboard = () => {
     const [data, setData] = useState(initialData);
     const [isLoading, setIsLoading] = useState(false);
     const [dbProducts, setDbProducts] = useState([]);
+    const [inventoryAlerts, setInventoryAlerts] = useState([]);
     
     const [productionGuide, setProductionGuide] = useState(initialProductionGuide);
     const [selectedIds, setSelectedIds] = useState([]);
@@ -260,6 +261,13 @@ const Dashboard = () => {
                 }
             } catch (e) {
                 console.error("Failed to fetch real products:", e);
+            }
+
+            try {
+                const alertsRes = await api.get('/inventory/alerts');
+                setInventoryAlerts(alertsRes.data || []);
+            } catch (e) {
+                console.error("Failed to fetch inventory alerts:", e);
             }
 
             try {
@@ -766,6 +774,37 @@ const Dashboard = () => {
                         </button>
                     </div>
                 </div>
+            </ScrollReveal>
+
+            {/* Inventory Alerts Summary Widget */}
+            <ScrollReveal variant="fade-up" duration={900} delay={50}>
+                {inventoryAlerts && inventoryAlerts.length > 0 ? (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center space-x-3">
+                            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                            <div>
+                                <h3 className="text-sm font-bold text-red-700">Inventory Action Required</h3>
+                                <p className="text-xs text-red-600">You have {inventoryAlerts.length} items that are low in stock or nearing expiry.</p>
+                            </div>
+                        </div>
+                        <a href="/admin/inventory" className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-xs font-bold transition-colors text-center whitespace-nowrap">
+                            Manage Inventory
+                        </a>
+                    </div>
+                ) : (
+                    <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center space-x-3">
+                            <Check className="w-6 h-6 text-emerald-500 flex-shrink-0" />
+                            <div>
+                                <h3 className="text-sm font-bold text-emerald-700">Inventory Status: Optimal</h3>
+                                <p className="text-xs text-emerald-600">All stock levels are adequate and no items are nearing expiry.</p>
+                            </div>
+                        </div>
+                        <a href="/admin/inventory" className="px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-xs font-bold transition-colors text-center whitespace-nowrap">
+                            View Inventory
+                        </a>
+                    </div>
+                )}
             </ScrollReveal>
 
             {/* Middle Split Console */}

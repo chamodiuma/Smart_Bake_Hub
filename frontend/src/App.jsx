@@ -28,6 +28,7 @@ import Orders from './pages/admin/Orders';
 import Users from './pages/admin/Users';
 import Products from './pages/admin/Products';
 import WasteReduction from './pages/admin/WasteReduction';
+import Reports from './pages/admin/Reports';
 import ProductMenuManagement from './pages/admin/ProductMenuManagement';
 import AddProduct from './pages/admin/AddProduct';
 import EditProduct from './pages/admin/EditProduct';
@@ -42,6 +43,7 @@ import Settings from './pages/admin/Settings';
 import Notifications from './pages/admin/Notifications';
 import QRCodes from './pages/admin/QRCodes';
 import ChatSupport from './pages/admin/ChatSupport';
+import InventoryManagement from './pages/admin/InventoryManagement';
 import StaffDashboard from './pages/staff/StaffDashboard';
 import StaffLogin from './pages/auth/StaffLogin';
 import AdminSetup from './pages/auth/AdminSetup';
@@ -140,10 +142,13 @@ function App() {
                     <Route path="ai/waste" element={<WasteReduction />} />
                     <Route path="events" element={<Events />} />
                     <Route path="events/add" element={<AddEvent />} />
+                    <Route path="inventory" element={<InventoryManagement />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="qrcodes" element={<QRCodes />} />
                     <Route path="chat" element={<ChatSupport />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="reports" element={<Reports />} />
                 </Route>
 
                 {/* Staff Routes */}

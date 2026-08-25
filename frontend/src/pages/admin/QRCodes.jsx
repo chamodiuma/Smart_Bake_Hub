@@ -52,7 +52,8 @@ const QRCodes = () => {
             
             const pngFile = canvas.toDataURL("image/png");
             const downloadLink = document.createElement("a");
-            downloadLink.download = `SmartBakeHub_Table_${tableNumber}_QR.png`;
+            const filename = tableNumber === 'general' ? 'SmartBakeHub_General_QR.png' : `SmartBakeHub_Table_${tableNumber}_QR.png`;
+            downloadLink.download = filename;
             downloadLink.href = `${pngFile}`;
             downloadLink.click();
         };
@@ -95,6 +96,47 @@ const QRCodes = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* General / Takeaway QR Code */}
+                <div className="bg-amber-50 p-6 rounded-3xl border border-amber-200 shadow-sm flex flex-col items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-[#2E1A12]">General QR Code</h3>
+                        <p className="text-[11px] text-amber-700 font-medium">For Takeaway / Online Orders</p>
+                    </div>
+                    
+                    <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-amber-300">
+                        <QRCodeSVG
+                            id={`qr-general`}
+                            value={`${getBaseUrl()}/menus`}
+                            size={180}
+                            level={"H"}
+                            includeMargin={true}
+                            ref={(el) => (qrRefs.current['general'] = el)}
+                            imageSettings={{
+                                src: "/images/logo.png",
+                                x: undefined,
+                                y: undefined,
+                                height: 40,
+                                width: 40,
+                                excavate: true,
+                            }}
+                        />
+                    </div>
+                    
+                    <p className="text-[10px] text-center text-amber-600 break-all px-2 font-medium">
+                        {`${getBaseUrl()}/menus`}
+                    </p>
+
+                    <div className="flex items-center gap-3 w-full mt-2">
+                        <button 
+                            onClick={() => downloadQRCode('general')}
+                            className="flex-1 bg-[#2E1A12] hover:bg-[#C8843B] text-white py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Download className="w-4 h-4" /> Download
+                        </button>
+                    </div>
+                </div>
+
+                {/* Table QR Codes */}
                 {tables.map(table => {
                     const orderUrl = `${getBaseUrl()}/menus?table=${encodeURIComponent(table.number)}`;
                     return (
