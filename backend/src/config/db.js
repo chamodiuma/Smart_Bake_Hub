@@ -7,7 +7,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const configBase = {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || 'password',
+    password: process.env.DB_PASS !== undefined ? process.env.DB_PASS : '',
     database: process.env.DB_NAME || 'smart_bake_hub',
     port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306
 };
