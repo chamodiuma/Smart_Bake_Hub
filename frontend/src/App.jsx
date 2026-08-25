@@ -46,11 +46,14 @@ import StaffDashboard from './pages/staff/StaffDashboard';
 import StaffLogin from './pages/auth/StaffLogin';
 import AdminSetup from './pages/auth/AdminSetup';
 
-const PrivateRoute = ({ children, roles }) => {
+const PrivateRoute = ({ children, roles, loginPath }) => {
     const { user } = useAuthStore();
     
     // Redirect logic
     if (!user) {
+        if (loginPath) {
+            return <Navigate to={loginPath} />;
+        }
         if (roles && (roles.includes('admin') || roles.includes('staff'))) {
             return <Navigate to="/admin/login" />;
         }
@@ -145,7 +148,7 @@ function App() {
 
                 {/* Staff Routes */}
                 <Route path="/staff" element={
-                    <PrivateRoute roles={['staff', 'admin']}>
+                    <PrivateRoute roles={['staff', 'admin']} loginPath="/staff/login">
                         <StaffDashboard />
                     </PrivateRoute>
                 } />
