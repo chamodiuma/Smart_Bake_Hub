@@ -20,24 +20,26 @@ const productRoutes = require('./src/routes/productRoutes');
 const menuRoutes = require('./src/routes/menuRoutes');
 const beverageRoutes = require('./src/routes/beverageRoutes');
 const aiRoutes = require('./src/routes/aiRoutes');
+const reportRoutes = require('./src/routes/reportRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
 const orderRoutes = require('./src/routes/orderRoutes');
 const cateringRoutes = require('./src/routes/cateringRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const chatRoutes = require('./src/routes/chatRoutes');
-
+const inventoryRoutes = require('./src/routes/inventoryRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/menus', menuRoutes);
 app.use('/api/beverages', beverageRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/catering', cateringRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
-
+app.use('/api/inventory', inventoryRoutes);
 app.get('/', (req, res) => {
     res.send('Smart Bake Hub API is running...');
 });
